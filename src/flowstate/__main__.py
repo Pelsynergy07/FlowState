@@ -91,9 +91,15 @@ def main() -> int:
     controller.signals.error.connect(show_error)
 
     tray.show()
-    controller.start()
+    is_first_run = not paths.first_run_flag_path().exists()
+    # On first run, the onboarding dialog below does its own (visible,
+    # progress-tracked) model download/load -- warming up here too would
+    # race it for the exact same models, with the onboarding UI showing
+    # no real progress while the invisible background warmup does the
+    # actual work (or vice versa). Only warm up here on normal launches.
+    controller.start(warmup=not is_first_run)
 
-    if not paths.first_run_flag_path().exists():
+    if is_first_run:
         onboarding = OnboardingDialog(controller)
         onboarding.exec()
 

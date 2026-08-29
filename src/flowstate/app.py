@@ -90,10 +90,11 @@ class RecordingController:
                 return d.index
         return None
 
-    def start(self) -> None:
+    def start(self, warmup: bool = True) -> None:
         self._hotkeys.start()
         enforce_retention()
-        self.warmup_async()
+        if warmup:
+            self.warmup_async()
         logger.info("FlowState controller started")
 
     def warmup_async(self) -> None:

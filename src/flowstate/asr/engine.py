@@ -57,6 +57,21 @@ class TranscriptionEngine:
     def active_model_id(self) -> str | None:
         return self._active_model_id
 
+    def resolve_target_model(self) -> models.ModelSpec:
+        """Which model _load() would pick right now, without loading or
+        downloading anything -- lets a caller (onboarding) pre-download
+        with real progress before the actual, blocking load happens."""
+        want_cuda = self._device_preference == "cuda" or (
+            self._device_preference == "auto" and self._probe_cuda()
+        )
+        if want_cuda:
+            model_id = self._requested_model_id
+        elif self._device_preference == "auto":
+            model_id = models.CPU_FALLBACK_MODEL_ID
+        else:
+            model_id = self._requested_model_id
+        return models.get_model_spec(model_id)
+
     def _probe_cuda(self) -> bool:
         if self._device_preference == "cpu":
             return False

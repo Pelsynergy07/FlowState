@@ -30,6 +30,7 @@ logger = logging.getLogger("flowstate.text.formatter")
 
 MODEL_REPO = "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
 MODEL_FILE = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+APPROX_SIZE_MB = 1150  # for onboarding's download progress estimate
 MAX_OUTPUT_TOKENS = 300
 CONTEXT_SIZE = 1024
 N_THREADS = 6

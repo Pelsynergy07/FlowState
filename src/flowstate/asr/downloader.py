@@ -27,6 +27,41 @@ def _dir_size(path: Path) -> int:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
 
+def download_dir_with_progress(
+    target_dir: Path,
+    expected_bytes: int,
+    do_download,
+    on_progress=None,
+) -> None:
+    """Runs do_download() (a blocking, no-arg callable that downloads into
+    target_dir) while polling target_dir's total size against
+    expected_bytes to estimate percent complete, emitting to on_progress
+    every 0.5s. Blocking -- call from a background thread, not the UI
+    thread. Works regardless of exactly which filenames/temp-file scheme
+    the download uses internally, since it sums everything under
+    target_dir rather than watching one specific path."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+    stop_event = threading.Event()
+
+    def poll() -> None:
+        while not stop_event.is_set():
+            current = _dir_size(target_dir)
+            pct = min(99, int(current / expected_bytes * 100)) if expected_bytes > 0 else 0
+            if on_progress:
+                on_progress(pct)
+            stop_event.wait(0.5)
+
+    poll_thread = threading.Thread(target=poll, daemon=True)
+    poll_thread.start()
+    try:
+        do_download()
+    finally:
+        stop_event.set()
+        poll_thread.join(timeout=1)
+    if on_progress:
+        on_progress(100)
+
+
 class ModelDownloadWorker(QObject):
     progress = Signal(int)  # 0-100, estimated
     finished = Signal(str)  # local directory the model was downloaded into
