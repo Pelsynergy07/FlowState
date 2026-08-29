@@ -19,8 +19,9 @@ plain-English explanation of the architecture and the AI models involved.
 
 Grab `FlowStateSetup.exe` from the
 [latest release](../../releases/latest) and run it -- no admin rights
-needed. On first launch FlowState downloads its AI models (roughly 1.6GB
-with a GPU, ~150MB without one) and then works fully offline.
+needed. On first launch FlowState downloads its AI models -- the speech
+model (~1.6GB with a GPU, ~150MB without one) plus a small local model for
+text cleanup (~1.1GB, downloaded either way) -- then works fully offline.
 
 **Requirements:** Windows 10 or 11, 64-bit. An NVIDIA GPU is optional --
 if one isn't found, FlowState automatically switches to a smaller,
@@ -44,6 +45,97 @@ tooling needs to be installed separately; the installer is self-contained.
   Settings -> Capture.
 - Recent sessions (transcript + any screenshots) are available from the
   tray icon and in Settings -> History.
+
+## Your own vocabulary
+
+FlowState ships with a built-in pass that fixes common casing --
+`github` -> `GitHub`, `json` -> `JSON`, and so on -- but it can't know
+`kubectl`, an internal project name, or a colleague's surname. Add your
+own by creating (or editing):
+
+```
+%LOCALAPPDATA%\FlowState\vocabulary_user.json
+```
+
+```json
+{
+  "cube cuttle": "kubectl",
+  "engine x": "nginx"
+}
+```
+
+The key is what the transcript tends to say, the value is what you
+meant. Matching is whole-word and case-insensitive, and longer phrases
+win over a shorter one contained inside them, so `"ci cd"` beats a bare
+`"ci"`. The file is re-read automatically whenever it changes -- no
+restart needed. A term you list here overrides the built-in spelling for
+that same word. One rule worth respecting: don't map an ordinary word
+(e.g. `"read me"`) to something else -- it'll rewrite every sentence that
+happens to contain that phrase. A malformed file is just ignored rather
+than breaking transcription.
+
+## Clipboard behavior
+
+When you stop recording, FlowState puts the cleaned-up transcript on
+your clipboard and sends one Ctrl+V into whichever window was focused
+when you *started* recording, then restores whatever was on your
+clipboard before. If you captured any screenshots, each one gets pasted
+the same way right after, as its own separate Ctrl+V -- deliberately one
+item per paste, since putting text and an image on the clipboard
+together made some apps (browsers, chat inputs that accept image paste)
+treat the whole thing as an image attach and silently drop the text.
+Your original clipboard content is restored once everything's landed.
+
+## Privacy and storage
+
+- Speech-to-text and text cleanup both run locally. The only network
+  activity FlowState ever does is downloading its models from Hugging
+  Face, once, the first time each is needed -- nothing about your voice
+  or transcripts is ever sent anywhere.
+- Models live in `%LOCALAPPDATA%\FlowState\models\`: the speech model
+  (Whisper `large-v3-turbo` on a GPU, or the smaller `base.en` on CPU)
+  and a small local LLM used for text cleanup.
+- Sessions (transcript + any screenshots) are saved to
+  `%LOCALAPPDATA%\FlowState\sessions\`, kept for 7 days, and capped at
+  500MB total -- oldest deleted first once that's exceeded.
+- Settings live in `config.json`, logs in `logs\flowstate.log`, both
+  under the same `%LOCALAPPDATA%\FlowState` folder.
+- Uninstalling deliberately leaves this folder alone (so an upgrade or
+  reinstall doesn't wipe your models and history) -- delete it by hand
+  if you want a fully clean removal.
+
+## Troubleshooting
+
+- **A shortcut does nothing:** open Settings -> Shortcuts. Toggle and
+  push-to-talk can't share all their keys with each other (e.g. don't
+  set push-to-talk to `shift+space` while the toggle is
+  `ctrl+shift+space`) -- FlowState refuses to save a combination like
+  that, since a quick tap of the longer one gets misread as the shorter
+  one. If both look fine, check `%LOCALAPPDATA%\FlowState\logs\flowstate.log`
+  for `Keyboard hook installed`; if that line is missing, restart
+  FlowState.
+- **"FlowState is already running" but you don't see the tray icon:** a
+  previous instance may still be holding the single-instance lock. Check
+  Task Manager for a leftover `FlowState.exe` (or `python.exe` in a dev
+  setup), end it, then relaunch.
+- **Transcript or screenshot lands in the wrong window:** FlowState
+  pastes into whichever window was focused the moment you *started*
+  recording -- if you switch windows mid-recording, that's where it'll
+  land.
+- **Transcription feels slow:** check Settings -> Model. If it says
+  "Currently running on: CPU," no compatible NVIDIA GPU/CUDA was found,
+  so FlowState fell back to a smaller model automatically -- this is
+  expected on machines without an NVIDIA GPU, just slower than GPU mode.
+- **Nothing happens for the first few seconds after launch:** the AI
+  models are still loading in the background; give it a moment, or use
+  the first-run setup dialog, which waits for both models before it lets
+  you finish.
+- **Screenshot capture isn't grabbing anything:** confirm the right mode
+  is picked in Settings -> Capture (circle vs. Ctrl+drag), and that
+  you're actively recording when you gesture -- capture only listens
+  while a recording is in progress.
+- **A model failed to download:** usually a network hiccup on first
+  launch. Just restart FlowState to retry.
 
 ## Development setup
 
