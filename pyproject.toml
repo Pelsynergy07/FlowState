@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Local, offline voice dictation with screen-context capture for Windows"
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
+license = "MIT"
+urls = { Homepage = "https://github.com/Pelsynergy07/FlowState", Repository = "https://github.com/Pelsynergy07/FlowState" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

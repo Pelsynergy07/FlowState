@@ -1,5 +1,7 @@
 # FlowState
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Local, offline voice dictation for Windows: press a hotkey, speak, and the
 cleaned-up transcript is pasted into whatever text field was focused.
 While recording, circle something on screen (or Ctrl+drag a box) to
@@ -72,3 +74,13 @@ powershell -File packaging\build.ps1
 Produces `packaging\dist_installer\FlowStateSetup.exe`. Requires
 [Inno Setup 6](https://jrsoftware.org/isdl.php) on the machine doing the
 build (not needed by anyone just running the resulting installer).
+
+## Contributing
+
+Issues and pull requests are welcome. There's no formal process yet --
+just open an issue for bugs or ideas, or a PR if you've already got a
+fix. `.venv\Scripts\python.exe -m pytest` should stay green.
+
+## License
+
+[MIT](LICENSE).
