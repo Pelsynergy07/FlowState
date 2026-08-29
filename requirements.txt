@@ -1,0 +1,32 @@
+PySide6>=6.7
+faster-whisper>=1.0
+nvidia-cublas-cu12>=12.0; sys_platform == "win32"
+nvidia-cudnn-cu12>=9.0; sys_platform == "win32"
+nvidia-cuda-runtime-cu12>=12.0; sys_platform == "win32"
+nvidia-cuda-nvrtc-cu12>=12.0; sys_platform == "win32"
+sounddevice>=0.4.6
+numpy>=1.26,<3
+mss>=9.0
+pillow>=10.3
+pynput>=1.7.6
+pywin32>=306
+huggingface_hub>=0.23
+
+# llama-cpp-python: install from the project's dedicated CPU wheel index,
+# capped at 0.3.19. The CUDA-enabled (cuXXX) wheels bundle a CPU codepath
+# that crashes with an illegal-instruction error on CPUs without
+# AVX-512 -- happens even with n_gpu_layers=0, so GPU offload isn't
+# actually available through this route on such machines. CPU-only is
+# plenty fast at this model size (~1.3s load, under 1.5s per formatting
+# call), so it's the default. The extra index below is what actually
+# makes `pip install -r requirements.txt` pull that safe CPU wheel
+# instead of whatever PyPI's default resolution would give. The upper
+# version bound matters too: PyPI's own llama-cpp-python releases newer
+# than 0.3.19 ship as a source tarball only (no prebuilt Windows wheel
+# at all), which fails to install on a machine without a C++ build
+# toolchain -- 0.3.19 is the newest release this CPU wheel index has a
+# win_amd64/cp312 wheel for.
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+llama-cpp-python>=0.3,<=0.3.19
+
+pytest>=8.2
