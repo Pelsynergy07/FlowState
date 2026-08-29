@@ -21,7 +21,7 @@ from PySide6.QtCore import QObject, Signal
 
 from .asr.engine import TranscriptionEngine
 from .audio import cues
-from .audio.devices import list_input_devices
+from .audio.devices import default_input_device, list_input_devices
 from .audio.recorder import Recorder
 from .capture.annotate import draw_circle_highlight, draw_rect_highlight
 from .capture.drag_hook import DragCaptureHook
@@ -84,7 +84,14 @@ class RecordingController:
     @staticmethod
     def _resolve_device_index(name: str | None) -> int | None:
         if not name:
-            return None
+            # No mic explicitly chosen (e.g. a fresh install) -- resolve
+            # through WASAPI's own default rather than leaving this None,
+            # which would hand PortAudio's cross-host-API-ambiguous
+            # "default" straight to the audio stream and can silently
+            # pick a non-functional device on a Windows machine with
+            # several audio host APIs installed.
+            default = default_input_device()
+            return default.index if default is not None else None
         for d in list_input_devices():
             if d.name == name:
                 return d.index
