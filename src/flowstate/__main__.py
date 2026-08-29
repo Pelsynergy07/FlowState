@@ -5,6 +5,7 @@ hotkeys, and (on first run) the setup wizard. This is what the installed
 
 from __future__ import annotations
 
+import os
 import sys
 
 from PySide6.QtWidgets import QApplication, QMessageBox
@@ -35,6 +36,17 @@ def _acquire_single_instance_lock():
 
 
 def main() -> int:
+    # Belt-and-suspenders alongside packaging/entry_point.py's identical
+    # guard: a windowed build (no console attached) has sys.stdout/stderr
+    # as literally None, and logging.StreamHandler() (configure_logging,
+    # right below) captures sys.stderr at construction time -- so this
+    # has to run before that, no matter how this function ends up called.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+
     logger = configure_logging()
 
     lock = _acquire_single_instance_lock()
