@@ -48,6 +48,13 @@ class TranscriptionEngine:
         # the hotkey immediately at launch can both call transcribe() ->
         # _load() at nearly the same time.
         self._load_lock = threading.Lock()
+        # Set once _load_locked() fails outright (both CUDA and CPU
+        # attempts, or a CPU-only load) -- without this, every recording
+        # attempt after a failed download independently retries the whole
+        # multi-GB download from scratch, so a genuinely broken network
+        # turns into a fresh multi-minute stall on every single hotkey
+        # press instead of a clear, immediate error after the first one.
+        self._load_failure: str | None = None
 
     @property
     def active_device(self) -> str | None:
@@ -100,7 +107,36 @@ class TranscriptionEngine:
         with self._load_lock:
             if self._model is not None:  # another thread won the race
                 return
-            self._load_locked()
+            if self._load_failure is not None:
+                raise RuntimeError(self._load_failure)
+            try:
+                self._load_locked()
+            except Exception as exc:
+                self._load_failure = self._describe_load_error(exc)
+                raise RuntimeError(self._load_failure) from exc
+
+    @staticmethod
+    def _describe_load_error(exc: Exception) -> str:
+        """A short, human-readable explanation instead of a raw stack
+        trace string -- this is what ends up in the "Something went
+        wrong" dialog the user actually sees."""
+        signature = f"{type(exc).__name__} {exc}"
+        network_markers = (
+            "ConnectionError",
+            "Timeout",
+            "TimeoutError",
+            "Max retries exceeded",
+            "NewConnectionError",
+            "getaddrinfo failed",
+            "NameResolutionError",
+            "ConnectTimeout",
+        )
+        if any(marker in signature for marker in network_markers):
+            return (
+                "Could not download the speech model -- check your internet connection, "
+                "then restart FlowState to try again."
+            )
+        return f"Could not load the speech model ({type(exc).__name__}: {exc}). Restart FlowState to try again."
 
     def _load_locked(self) -> None:
         from faster_whisper import WhisperModel
