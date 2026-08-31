@@ -20,8 +20,11 @@ class TrayController:
         on_toggle_recording: Callable[[], None],
         on_open_settings: Callable[[], None],
         on_quit: Callable[[], None],
+        on_update_requested: Callable[[UpdateInfo], None] | None = None,
     ):
         self._on_toggle_recording = on_toggle_recording
+        self._on_update_requested = on_update_requested
+        self._update_info: UpdateInfo | None = None
 
         self.tray_icon = QSystemTrayIcon(build_tray_icon(recording=False))
         self.tray_icon.setToolTip("FlowState")
@@ -35,8 +38,7 @@ class TrayController:
         # never shown when the app is already on the latest release.
         self._update_action = self.menu.addAction("Update available")
         self._update_action.setVisible(False)
-        self._update_action.triggered.connect(self._open_update_url)
-        self._update_url: str | None = None
+        self._update_action.triggered.connect(self._handle_update_click)
 
         self.menu.addSeparator()
         self.recent_menu = self.menu.addMenu("Recent Sessions")
@@ -74,17 +76,16 @@ class TrayController:
         """Shows/hides the update menu entry. Called with None on every
         launch where the app is already current -- that's the normal case,
         so the entry must stay hidden rather than showing something stale."""
+        self._update_info = info
         if info is None:
             self._update_action.setVisible(False)
-            self._update_url = None
             return
         self._update_action.setText(f"Update available: v{info.version}")
         self._update_action.setVisible(True)
-        self._update_url = info.url
 
-    def _open_update_url(self) -> None:
-        if self._update_url:
-            os.startfile(self._update_url)
+    def _handle_update_click(self) -> None:
+        if self._update_info is not None and self._on_update_requested is not None:
+            self._on_update_requested(self._update_info)
 
     def set_recording_state(self, recording: bool) -> None:
         self.tray_icon.setIcon(build_tray_icon(recording=recording))

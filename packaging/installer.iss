@@ -12,6 +12,11 @@ AppId={{B6C9E1B2-6E6E-4A9B-9B6D-2E6C9C6D2F31}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+; Matches the mutex name FlowState.exe itself creates for its single-
+; instance guard (see _acquire_single_instance_lock in __main__.py). Lets
+; Setup detect a running FlowState and close/relaunch it around a silent
+; self-update (see updater.py's /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS).
+AppMutex=Global\FlowStateSingleInstance
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -45,7 +50,11 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FlowState"; ValueData: """{app}\{#MyAppExeName}"""; Tasks: launchatlogin; Flags: uninsdeletevalue
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+; No skipifsilent: a silent run (VERYSILENT) is exactly what updater.py's
+; self-update flow uses, and it depends on FlowState relaunching itself
+; afterwards -- unlike a normal silent enterprise deployment, this is
+; always user-initiated from inside the app, so auto-launch is wanted.
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
 
 ; Deliberately no [UninstallDelete] for %LOCALAPPDATA%\FlowState: the
 ; downloaded AI models (1-2GB) and session history live there, and

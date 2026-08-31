@@ -20,7 +20,9 @@ from .ui.onboarding import OnboardingDialog
 from .ui.settings_window import SettingsWindow
 from .ui.theme import apply_light_palette, build_stylesheet
 from .ui.tray import TrayController
+from .ui.update_installer import UpdateInstallDialog
 from .ui.update_notifier import UpdateNotifierSignals, check_for_update_async
+from .update_check import UpdateInfo
 
 
 def _acquire_single_instance_lock():
@@ -88,10 +90,31 @@ def main() -> int:
         controller.stop()
         app.quit()
 
+    def start_update(info: UpdateInfo) -> None:
+        if controller.is_recording:
+            QMessageBox.information(None, "FlowState", "Finish your current recording before updating.")
+            return
+        reply = QMessageBox.question(
+            None,
+            "FlowState",
+            f"Update to v{info.version} now?\n\n"
+            "FlowState will close and reopen automatically once the update finishes installing.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        dlg = UpdateInstallDialog(info)
+        dlg.exec()
+        if dlg.succeeded:
+            controller.stop()
+            app.quit()
+
     tray = TrayController(
         on_toggle_recording=controller.toggle_recording,
         on_open_settings=open_settings,
         on_quit=do_quit,
+        on_update_requested=start_update,
     )
     controller.signals.recording_started.connect(lambda: tray.set_recording_state(True))
     controller.signals.recording_finished.connect(lambda _text: tray.set_recording_state(False))

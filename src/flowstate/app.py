@@ -132,6 +132,10 @@ class RecordingController:
         """Current mic input level (0..1), for a HUD level meter."""
         return self._recorder.level()
 
+    @property
+    def is_recording(self) -> bool:
+        return self._recording
+
     def toggle_recording(self) -> None:
         if self._recording_mode == "toggle":
             self.stop_recording()

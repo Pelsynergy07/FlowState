@@ -28,6 +28,7 @@ logger = logging.getLogger("flowstate.update_check")
 
 GITHUB_REPO = "Pelsynergy07/FlowState"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+INSTALLER_ASSET_NAME = "FlowStateSetup.exe"  # matches installer.iss's OutputBaseFilename
 REQUEST_TIMEOUT_SECONDS = 5
 CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # don't re-hit the API more than every 6h
 
@@ -36,6 +37,16 @@ CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # don't re-hit the API more than every 6h
 class UpdateInfo:
     version: str  # e.g. "0.1.5", no leading "v"
     url: str  # release page to send the user to
+    download_url: str | None = None  # direct link to the installer asset, if attached
+    asset_size: int | None = None  # bytes, as reported by GitHub
+
+
+@dataclass(frozen=True)
+class _ReleaseInfo:
+    tag: str
+    html_url: str
+    download_url: str | None
+    asset_size: int | None
 
 
 def _parse_version(tag: str) -> tuple[int, int, int] | None:
@@ -72,9 +83,17 @@ def _save_cache(cache_path: Path, data: dict) -> None:
         logger.debug("Could not write update-check cache", exc_info=True)
 
 
-def _fetch_latest_release() -> tuple[str, str] | None:
-    """Returns (tag_name, html_url) for the latest GitHub release, or None
-    on any network/parse failure."""
+def _find_installer_asset(assets: list) -> tuple[str | None, int | None]:
+    for asset in assets:
+        if isinstance(asset, dict) and asset.get("name") == INSTALLER_ASSET_NAME:
+            return asset.get("browser_download_url"), asset.get("size")
+    return None, None
+
+
+def _fetch_latest_release() -> _ReleaseInfo | None:
+    """Returns the latest GitHub release's tag, page URL, and (if attached)
+    the installer asset's direct download URL/size -- or None on any
+    network/parse failure."""
     request = urllib.request.Request(
         GITHUB_API_URL,
         headers={"Accept": "application/vnd.github+json", "User-Agent": "FlowState-UpdateCheck"},
@@ -86,10 +105,11 @@ def _fetch_latest_release() -> tuple[str, str] | None:
         logger.debug("Update check request failed", exc_info=True)
         return None
     tag = data.get("tag_name")
-    url = data.get("html_url")
-    if not tag or not url:
+    html_url = data.get("html_url")
+    if not tag or not html_url:
         return None
-    return tag, url
+    download_url, asset_size = _find_installer_asset(data.get("assets") or [])
+    return _ReleaseInfo(tag=tag, html_url=html_url, download_url=download_url, asset_size=asset_size)
 
 
 def check_for_update(
@@ -111,15 +131,33 @@ def check_for_update(
         tag = cache.get("latest_tag")
         url = cache.get("latest_url")
         if tag and url and _is_newer(tag, current_version):
-            return UpdateInfo(version=tag.lstrip("vV"), url=url)
+            return UpdateInfo(
+                version=tag.lstrip("vV"),
+                url=url,
+                download_url=cache.get("download_url"),
+                asset_size=cache.get("asset_size"),
+            )
         return None
 
     result = _fetch_latest_release()
     if result is None:
         return None
-    tag, url = result
-    _save_cache(resolved_cache_path, {"checked_at": now, "latest_tag": tag, "latest_url": url})
+    _save_cache(
+        resolved_cache_path,
+        {
+            "checked_at": now,
+            "latest_tag": result.tag,
+            "latest_url": result.html_url,
+            "download_url": result.download_url,
+            "asset_size": result.asset_size,
+        },
+    )
 
-    if _is_newer(tag, current_version):
-        return UpdateInfo(version=tag.lstrip("vV"), url=url)
+    if _is_newer(result.tag, current_version):
+        return UpdateInfo(
+            version=result.tag.lstrip("vV"),
+            url=result.html_url,
+            download_url=result.download_url,
+            asset_size=result.asset_size,
+        )
     return None
