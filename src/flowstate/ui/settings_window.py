@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import paths
+from .. import __version__, paths
 from ..audio.devices import list_input_devices
 from ..config import ConfigStore
 from ..hotkeys.manager import bindings_conflict
@@ -143,6 +143,7 @@ class SettingsWindow(QDialog):
         layout.addWidget(_card(_eyebrow("02 / Behavior"), self.launch_at_login, self.sound_cues))
 
         layout.addStretch(1)
+        layout.addWidget(_muted(f"FlowState v{__version__}"))
         return page
 
     # -- Shortcuts --------------------------------------------------------

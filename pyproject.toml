@@ -1,6 +1,6 @@
 [project]
 name = "flowstate"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Local, offline voice dictation with screen-context capture for Windows"
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
@@ -17,6 +17,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "flowstate.__version__" }
 
 [tool.setuptools.package-data]
 "flowstate.resources" = ["*.json", "fonts/*.ttf"]

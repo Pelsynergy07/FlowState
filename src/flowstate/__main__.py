@@ -20,6 +20,7 @@ from .ui.onboarding import OnboardingDialog
 from .ui.settings_window import SettingsWindow
 from .ui.theme import apply_light_palette, build_stylesheet
 from .ui.tray import TrayController
+from .ui.update_notifier import UpdateNotifierSignals, check_for_update_async
 
 
 def _acquire_single_instance_lock():
@@ -103,6 +104,11 @@ def main() -> int:
     controller.signals.error.connect(show_error)
 
     tray.show()
+
+    update_signals = UpdateNotifierSignals()
+    update_signals.checked.connect(tray.set_update_available)
+    check_for_update_async(update_signals)
+
     is_first_run = not paths.first_run_flag_path().exists()
     # On first run, the onboarding dialog below does its own (visible,
     # progress-tracked) model download/load -- warming up here too would
