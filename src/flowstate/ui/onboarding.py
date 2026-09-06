@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -92,8 +93,8 @@ class _PreloadWorker(QObject):
             # 2. Compile Whisper weights into memory/VRAM with real-time heartbeat
             est_time = "5–12s" if self._is_gpu else "15–25s"
             dev_type = "GPU VRAM" if self._is_gpu else "System RAM"
-            self.status.emit(f"Compiling Whisper Turbo weights into {dev_type}...")
-            self.telemetry.emit(f"Allocating {dev_type} on {self._hw_name} (est. ~{est_time})...")
+            self.status.emit(f"Setting up speech recognition engine...")
+            self.telemetry.emit(f"Initializing voice models on {self._hw_name} (est. ~{est_time})...")
             self.progress.emit(50)
 
             stop_compile = threading.Event()
@@ -104,7 +105,7 @@ class _PreloadWorker(QObject):
                     time.sleep(1.0)
                     elapsed += 1
                     self.telemetry.emit(
-                        f"Compiling tensor graph into {dev_type} • {elapsed}s elapsed (est. ~{est_time} on {self._hw_name})..."
+                        f"Preparing speech engine • {elapsed}s elapsed (est. ~{est_time})..."
                     )
 
             hb_thread = threading.Thread(target=_compile_heartbeat, daemon=True)
@@ -118,15 +119,15 @@ class _PreloadWorker(QObject):
             device = self._controller._asr.active_device
             model_id = self._controller._asr.active_model_id
             dev_label = "CUDA Accelerated" if device == "cuda" else "CPU AVX2"
-            self.status.emit(f"✓ Speech model ready: {model_id} ({dev_label}).")
-            self.telemetry.emit(f"Tensor graph loaded into {dev_type} successfully.")
+            self.status.emit(f"✓ Speech engine ready ({dev_label}).")
+            self.telemetry.emit(f"Voice recognition initialized successfully.")
 
             # 3. Download Qwen 1.5B text-formatting model
             self._download_formatter()
 
             # 4. Initialize formatting model into memory
-            self.status.emit("Initializing smart-formatting LLM engine...")
-            self.telemetry.emit("Loading Qwen 1.5B tokenizer & weights into local memory (est. ~3–6s)...")
+            self.status.emit("Setting up smart text formatting...")
+            self.telemetry.emit("Loading smart text formatter into memory...")
             self.progress.emit(95)
 
             stop_fmt = threading.Event()
@@ -137,7 +138,7 @@ class _PreloadWorker(QObject):
                     time.sleep(1.0)
                     elapsed += 1
                     self.telemetry.emit(
-                        f"Allocating formatting LLM context window • {elapsed}s elapsed (est. ~3–6s)..."
+                        f"Finalizing AI text formatting • {elapsed}s elapsed..."
                     )
 
             hb_fmt = threading.Thread(target=_fmt_heartbeat, daemon=True)
@@ -148,8 +149,8 @@ class _PreloadWorker(QObject):
                 stop_fmt.set()
                 hb_fmt.join(timeout=1.0)
 
-            self.status.emit("✓ All models verified and ready on your PC!")
-            self.telemetry.emit(f"Ready for instant offline dictation • Zero cloud dependencies.")
+            self.status.emit("✓ FlowState is ready to use!")
+            self.telemetry.emit("Ready for instant offline dictation • Private on your PC.")
             self.progress.emit(100)
         except Exception as exc:
             logger.error("Preload worker failed", exc_info=True)
@@ -212,8 +213,8 @@ class OnboardingDialog(QDialog):
         self._controller = controller
         self.setWindowTitle("FlowState Setup")
         self.setStyleSheet(build_stylesheet())
-        self.resize(630, 580)
-        self.setMinimumSize(590, 530)
+        self.resize(680, 610)
+        self.setMinimumSize(640, 560)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         cfg = controller.config_store.config
@@ -243,15 +244,6 @@ class OnboardingDialog(QDialog):
         header_left.addLayout(eyebrow_row)
         header_left.addWidget(headline)
         header_row.addLayout(header_left, 1)
-
-        badges_col = QVBoxLayout()
-        badges_col.setSpacing(6)
-        b1 = StickerBadge("100% LOCAL AI", bg_color=LIME, text_color="#1A1A1A", is_pill=True)
-        b2 = StickerBadge("ZERO TELEMETRY", bg_color="#1A1A1A", text_color="#FFFFFF", is_pill=False)
-        badges_col.addWidget(b1)
-        badges_col.addWidget(b2)
-        header_row.addLayout(badges_col)
-
         outer.addLayout(header_row)
 
         rule = QFrame()
@@ -283,9 +275,47 @@ class OnboardingDialog(QDialog):
         hw_texts.addWidget(hw_sub)
         hw_layout.addWidget(hw_icon)
         hw_layout.addLayout(hw_texts, 1)
-        hw_cross = GeometricMotif("cross", size=13, color="#7A746C")
-        hw_layout.addWidget(hw_cross)
         outer.addWidget(hw_card)
+
+        # 2b. Microphone input selector card
+        mic_card = QFrame()
+        mic_card.setProperty("role", "card")
+        mic_layout = QHBoxLayout(mic_card)
+        mic_layout.setContentsMargins(16, 10, 16, 10)
+        mic_layout.setSpacing(12)
+
+        mic_icon = QLabel("🎙️")
+        mic_icon.setFont(make_font(FONT_FAMILY, 15))
+        mic_layout.addWidget(mic_icon)
+
+        mic_texts = QVBoxLayout()
+        mic_texts.setSpacing(2)
+        mic_lbl = QLabel("AUDIO INPUT (MICROPHONE):")
+        mic_lbl.setFont(make_font(FONT_FAMILY_MONO, 8.5, bold=True))
+        mic_sub = QLabel("Select your microphone:")
+        mic_sub.setFont(make_font(FONT_FAMILY, 8.5))
+        mic_sub.setStyleSheet("color: #5C5751;")
+        mic_texts.addWidget(mic_lbl)
+        mic_texts.addWidget(mic_sub)
+        mic_layout.addLayout(mic_texts)
+
+        self.mic_combo = QComboBox()
+        self.mic_combo.setFixedHeight(32)
+        self.mic_combo.addItem("System Default", None)
+        try:
+            from ..audio.devices import list_input_devices
+            for d in list_input_devices():
+                self.mic_combo.addItem(d.name, d.name)
+        except Exception:
+            logger.warning("Could not enumerate audio devices in onboarding", exc_info=True)
+
+        current_mic = cfg.general.microphone_device
+        idx = self.mic_combo.findData(current_mic)
+        self.mic_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.mic_combo.currentIndexChanged.connect(self._on_mic_changed)
+        mic_layout.addWidget(self.mic_combo, 1)
+
+        outer.addWidget(mic_card)
 
         # 3. Core features with fun, energetic neo-brutalist copy
         features_card = QFrame()
@@ -309,10 +339,10 @@ class OnboardingDialog(QDialog):
             row.addWidget(txt, 1)
             return row
 
-        f_layout.addLayout(_make_bullet("[ 01 ]", f"Speak Freely ({cfg.shortcuts.push_to_talk}):", "Hold the key to unleash your thoughts anywhere, release to paste instantly."))
-        f_layout.addLayout(_make_bullet("[ 02 ]", f"Hands-Free Flow ({cfg.shortcuts.toggle}):", "Tap once for continuous thought capture without holding any buttons."))
-        f_layout.addLayout(_make_bullet("[ 03 ]", "Visual Context (Ctrl + Drag):", "Highlight anything on your screen so the AI sees exactly what you're pointing at."))
-        f_layout.addLayout(_make_bullet("[ 04 ]", "Pure Superpower:", "Fixes punctuation, bullet lists, and phrasing on the fly — 100% private on your device."))
+        f_layout.addLayout(_make_bullet("[ 01 ]", f"Hold to Talk ({cfg.shortcuts.push_to_talk}):", "Speak and release to paste."))
+        f_layout.addLayout(_make_bullet("[ 02 ]", f"Hands-Free ({cfg.shortcuts.toggle}):", "Tap to speak, tap again to paste."))
+        f_layout.addLayout(_make_bullet("[ 03 ]", "Highlight (Ctrl+Drag):", "Select any area on your screen."))
+        f_layout.addLayout(_make_bullet("[ 04 ]", "AI Polish:", "Auto-cleans grammar and structure."))
         outer.addWidget(features_card)
 
         # 4. Status & Telemetry section
@@ -327,7 +357,7 @@ class OnboardingDialog(QDialog):
         self.spinner.hide()
         status_header_row.addWidget(self.spinner)
 
-        self.status_label = QLabel("Click below to warm up local models and start.")
+        self.status_label = QLabel("Click below to prepare your offline speech engine and start.")
         self.status_label.setFont(make_font(FONT_FAMILY, 10, bold=True))
         self.status_label.setWordWrap(True)
         status_header_row.addWidget(self.status_label, 1)
@@ -353,15 +383,15 @@ class OnboardingDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
-        self.skip_btn = QPushButton("Skip Onboarding →")
+        self.skip_btn = QPushButton("Skip for Now")
         self.skip_btn.setProperty("role", "secondary")
-        self.skip_btn.setFixedWidth(160)
+        self.skip_btn.setMinimumWidth(130)
         self.skip_btn.setFixedHeight(46)
         self.skip_btn.setCursor(Qt.PointingHandCursor)
         self.skip_btn.clicked.connect(self._skip_onboarding)
         btn_row.addWidget(self.skip_btn)
 
-        self.start_btn = QPushButton("Warm Up Models && Start")
+        self.start_btn = QPushButton("Get Started →")
         self.start_btn.setFixedHeight(46)
         self.start_btn.setProperty("role", "primary")
         self.start_btn.setCursor(Qt.PointingHandCursor)
@@ -372,23 +402,18 @@ class OnboardingDialog(QDialog):
 
         self._thread: QThread | None = None
         self._worker: _PreloadWorker | None = None
-        self._stamp_pixmap: QPixmap | None = None
-        stamp_path = Path(__file__).parent.parent / "resources" / "icons" / "stamp_seal.png"
-        if stamp_path.exists():
-            self._stamp_pixmap = QPixmap(str(stamp_path))
 
     def paintEvent(self, event):
         painter = QPainter(self)
         paint_paper_background(painter, self.rect())
-        if self._stamp_pixmap and not self._stamp_pixmap.isNull():
-            painter.save()
-            painter.setOpacity(0.13)
-            # Subtle rotated editorial inspection seal in top-right background
-            stamp_sz = 140
-            x = self.width() - stamp_sz - 18
-            y = 10
-            painter.drawPixmap(x, y, stamp_sz, stamp_sz, self._stamp_pixmap)
-            painter.restore()
+
+    def _on_mic_changed(self) -> None:
+        new_mic = self.mic_combo.currentData()
+        self._controller.config_store.config.general.microphone_device = new_mic
+        self._controller.config_store.save()
+        if hasattr(self._controller, "apply_config_change"):
+            self._controller.apply_config_change()
+        logger.info("Microphone updated in onboarding: %r", new_mic)
 
     def _skip_onboarding(self) -> None:
         self.skipped = True
@@ -397,7 +422,7 @@ class OnboardingDialog(QDialog):
 
     def _start_setup(self) -> None:
         self.start_btn.setEnabled(False)
-        self.start_btn.setText("Warming Up Models...")
+        self.start_btn.setText("Setting Things Up...")
         self.skip_btn.setEnabled(False)
         self.spinner.show()
         self.progress.setValue(0)
@@ -420,8 +445,8 @@ class OnboardingDialog(QDialog):
 
     def _on_finished(self) -> None:
         self.spinner.hide()
-        self.status_label.setText("Models ready! FlowState is primed for instant dictation.")
-        self.telemetry_label.setText("100% of weights verified on local disk & memory.")
+        self.status_label.setText("FlowState is ready for instant dictation!")
+        self.telemetry_label.setText("Everything is installed and ready to go.")
         self.progress.setValue(100)
         self.start_btn.setText("Open FlowState && Start Tutorial →")
         self.start_btn.setEnabled(True)

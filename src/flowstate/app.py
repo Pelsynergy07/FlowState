@@ -43,6 +43,7 @@ class ControllerSignals(QObject):
     recording_started = Signal()
     processing_started = Signal()  # recording stopped, transcription/cleanup running
     recording_finished = Signal(str)  # cleaned transcript
+    no_speech_detected = Signal()
     error = Signal(str)
     drag_selection_started = Signal(int, int)
     drag_selection_moved = Signal(int, int)
@@ -275,19 +276,23 @@ class RecordingController:
             session.image_paths = list(self._captured_images)
             save_session(session)
 
-            if self._current_hwnd is not None:
-                restored = restore_foreground_window(self._current_hwnd)
-                if not restored:
-                    # Clipboard still has the transcript even though the
-                    # paste below will likely land nowhere useful -- better
-                    # than silently doing nothing and the user never
-                    # knowing why. See inject/focus.py for why this can
-                    # legitimately fail despite the retries in there.
-                    logger.warning(
-                        "Focus could not be restored to the original window; "
-                        "pasting anyway, but it may not land in the right place"
-                    )
-            paste_transcript(final_text, self._captured_images)
+            if not raw_text.strip() and not self._captured_images:
+                logger.info("Recording finished but no speech was detected (empty transcription).")
+                self.signals.no_speech_detected.emit()
+            else:
+                if self._current_hwnd is not None:
+                    restored = restore_foreground_window(self._current_hwnd)
+                    if not restored:
+                        # Clipboard still has the transcript even though the
+                        # paste below will likely land nowhere useful -- better
+                        # than silently doing nothing and the user never
+                        # knowing why. See inject/focus.py for why this can
+                        # legitimately fail despite the retries in there.
+                        logger.warning(
+                            "Focus could not be restored to the original window; "
+                            "pasting anyway, but it may not land in the right place"
+                        )
+                paste_transcript(final_text, self._captured_images)
         except Exception as exc:
             logger.error("Transcription/cleanup/paste failed", exc_info=True)
             self.signals.error.emit(str(exc))

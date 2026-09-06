@@ -27,4 +27,9 @@ os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 from flowstate.__main__ import main
 
 if __name__ == "__main__":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("pelsynergy.flowstate.app")
+    except Exception:
+        pass
     sys.exit(main())

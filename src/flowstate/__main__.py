@@ -54,6 +54,12 @@ def main() -> int:
 
     logger = configure_logging()
 
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("pelsynergy.flowstate.app")
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
@@ -111,6 +117,9 @@ def main() -> int:
     load_bundled_fonts()
     apply_light_palette(app)
     app.setStyleSheet(build_stylesheet())
+
+    from .ui.icon import build_app_icon
+    app.setWindowIcon(build_app_icon())
 
     from PySide6.QtWidgets import QSystemTrayIcon
 
@@ -196,12 +205,31 @@ def main() -> int:
 
     controller.signals.error.connect(show_error)
 
+    def _handle_no_speech() -> None:
+        hud.show_notice("No speech detected (check mic)")
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            tray.tray_icon.showMessage(
+                "FlowState",
+                "No speech was detected. Please check your microphone in Settings.",
+                QSystemTrayIcon.Information,
+                3000,
+            )
+
+    controller.signals.no_speech_detected.connect(_handle_no_speech)
+
     tray.show()
 
     def _handle_update_checked(info: UpdateInfo | None) -> None:
         nonlocal current_update_info
         current_update_info = info
         tray.set_update_available(info)
+        if info is not None and QSystemTrayIcon.isSystemTrayAvailable():
+            tray.tray_icon.showMessage(
+                "FlowState Update Available",
+                f"Release v{info.version} is available. Open Settings to update.",
+                QSystemTrayIcon.Information,
+                4000,
+            )
         if settings_dlg is not None and settings_dlg.isVisible():
             settings_dlg.set_update_info(info)
 
@@ -209,7 +237,7 @@ def main() -> int:
     update_signals.checked.connect(_handle_update_checked)
     check_for_update_async(update_signals)
 
-    is_first_run = not paths.first_run_flag_path().exists()
+    is_first_run = ("--first-run" in sys.argv) or (not paths.first_run_flag_path().exists())
     # On first run, the onboarding dialog below does its own (visible,
     # progress-tracked) model download/load -- warming up here too would
     # race it for the exact same models, with the onboarding UI showing

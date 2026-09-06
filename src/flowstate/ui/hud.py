@@ -114,6 +114,18 @@ class RecordingHUD(QWidget):
         self._state = "processing"
         self.update()
 
+    def show_notice(self, message: str = "No speech detected (check mic)", duration_ms: int = 2500) -> None:
+        self._state = "notice"
+        self._notice_message = message
+        self._timer.stop()
+        self._reposition()
+        self.show()
+        if not self._native_flags_applied:
+            self._apply_native_window_flags()
+            self._native_flags_applied = True
+        self.update()
+        QTimer.singleShot(duration_ms, self.hide_recording)
+
     def hide_recording(self) -> None:
         self._state = "idle"
         self._timer.stop()
@@ -206,4 +218,16 @@ class RecordingHUD(QWidget):
             painter.setPen(QColor(INK))
             painter.setFont(make_font(FONT_FAMILY_DISPLAY, 18, italic=True))
             painter.drawText(QRectF(38, 2, w - 44, h), Qt.AlignLeft | Qt.AlignVCenter, "Formatting...")
+
+        elif self._state == "notice":
+            cx = 20.0
+            _draw_diamond_emblem(painter, cx, cy, 7.0, QColor(ORANGE))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(PAPER_RAISED))
+            painter.drawEllipse(QPointF(cx, cy), 1.8, 1.8)
+
+            painter.setPen(QColor(INK))
+            painter.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
+            msg = getattr(self, "_notice_message", "No speech detected")
+            painter.drawText(QRectF(34, 2, w - 38, h), Qt.AlignLeft | Qt.AlignVCenter, msg)
 

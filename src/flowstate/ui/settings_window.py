@@ -40,7 +40,7 @@ from ..ui.update_notifier import UpdateNotifierSignals, check_for_update_async
 from ..update_check import UpdateInfo
 from .autostart import set_launch_at_login
 from .key_recorder import KeyRecorderWidget
-from .theme import FONT_FAMILY_MONO, build_stylesheet, paint_paper_background
+from .theme import FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background
 from .widgets import BrutalistCheckBox, StickerBadge
 
 
@@ -110,30 +110,47 @@ class SettingsWindow(QDialog):
         outer.setContentsMargins(30, 26, 30, 22)
         outer.setSpacing(14)
 
-        # Header with metadata sticker badges and authentic textured rubber stamp
+        # Header with metadata version tag and dynamic update action
         header_row = QHBoxLayout()
+
         header_title_col = QVBoxLayout()
         header_title_col.setSpacing(4)
         header_title_col.addWidget(_eyebrow("SYS.01 // FLOWSTATE CONFIGURATION"))
         header_title_col.addWidget(_headline("Settings"))
         header_row.addLayout(header_title_col, 1)
 
-        # Subtle rubber stamp seal
-        stamp_path = Path(__file__).parent.parent / "resources" / "icons" / "stamp_seal.png"
-        if stamp_path.exists():
-            stamp_lbl = QLabel()
-            stamp_pix = QPixmap(str(stamp_path)).scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            stamp_lbl.setPixmap(stamp_pix)
-            stamp_lbl.setToolTip("FlowState Verified System Build")
-            header_row.addWidget(stamp_lbl)
+        badge_row = QHBoxLayout()
+        badge_row.setSpacing(8)
+        badge_row.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        badge_col = QVBoxLayout()
-        badge_col.setSpacing(4)
-        badge_status = StickerBadge("100% LOCAL AI", bg_color="#000000", text_color="#FFFFFF", is_pill=False)
-        badge_ver = StickerBadge(f"v{__version__} // WIN64", bg_color="#FFFFFF", text_color="#000000", is_pill=False)
-        badge_col.addWidget(badge_status)
-        badge_col.addWidget(badge_ver)
-        header_row.addLayout(badge_col)
+        self._version_badge = StickerBadge(f"v{__version__} // WIN64", bg_color=LIME, text_color="#121212", is_pill=False)
+        badge_row.addWidget(self._version_badge)
+
+        self._header_download_btn = QPushButton("DOWNLOAD UPDATE →")
+        self._header_download_btn.setCursor(Qt.PointingHandCursor)
+        self._header_download_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: #000000;
+                color: #FFFFFF;
+                border: 2px solid #000000;
+                border-radius: 0px;
+                font-family: {FONT_FAMILY_MONO};
+                font-size: 10px;
+                font-weight: 900;
+                padding: 4px 10px;
+            }}
+            QPushButton:hover {{
+                background-color: #D8FF3E;
+                color: #000000;
+            }}
+            """
+        )
+        self._header_download_btn.clicked.connect(self._trigger_update_install)
+        self._header_download_btn.hide()
+        badge_row.addWidget(self._header_download_btn)
+
+        header_row.addLayout(badge_row)
 
         outer.addLayout(header_row)
         outer.addWidget(_rule())
@@ -627,27 +644,16 @@ class SettingsWindow(QDialog):
         # 1. Developer Profile Card
         dev_card = QFrame()
         dev_card.setProperty("role", "card")
-        dev_card_layout = QHBoxLayout(dev_card)
-        dev_card_layout.setContentsMargins(20, 18, 20, 18)
-        dev_card_layout.setSpacing(20)
-
-        # Pixel art avatar
-        avatar_lbl = QLabel()
-        avatar_path = Path(__file__).parent.parent / "resources" / "icons" / "pelsynergy_avatar.png"
-        if avatar_path.exists():
-            avatar_pix = QPixmap(str(avatar_path)).scaled(88, 88, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            avatar_lbl.setPixmap(avatar_pix)
-        else:
-            avatar_lbl.setFixedSize(88, 88)
-        avatar_lbl.setStyleSheet("border: 2px solid #000000; background-color: #FFFFFF;")
-        dev_card_layout.addWidget(avatar_lbl)
+        dev_card_layout = QVBoxLayout(dev_card)
+        dev_card_layout.setContentsMargins(22, 18, 22, 18)
+        dev_card_layout.setSpacing(10)
 
         # Info column
         info_col = QVBoxLayout()
         info_col.setSpacing(6)
         info_col.addWidget(_eyebrow("CREATOR & ARCHITECT"))
 
-        author_name = QLabel("Developed with love by Pelsynergy")
+        author_name = QLabel("Developed with ❤️ by Pelsynergy")
         author_name.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 15px; font-weight: 900; color: #000000;")
         info_col.addWidget(author_name)
 
@@ -765,6 +771,19 @@ class SettingsWindow(QDialog):
 
     def set_update_info(self, info: UpdateInfo | None) -> None:
         self._update_info = info
+        if hasattr(self, "_version_badge"):
+            if info is None:
+                self._version_badge.setText(f"v{__version__} // WIN64")
+                self._version_badge.setColors(LIME, "#121212")
+                if hasattr(self, "_header_download_btn"):
+                    self._header_download_btn.hide()
+            else:
+                self._version_badge.setText(f"UPDATE AVAILABLE // v{info.version}")
+                self._version_badge.setColors("#D8FF3E", "#000000")
+                if hasattr(self, "_header_download_btn"):
+                    self._header_download_btn.setText(f"DOWNLOAD v{info.version} →")
+                    self._header_download_btn.show()
+
         if not hasattr(self, "_update_status_lbl"):
             return
         if info is None:

@@ -97,6 +97,15 @@ class StickerBadge(QWidget):
         self.updateGeometry()
         self.update()
 
+    def setColors(self, bg_color: QColor | str, text_color: QColor | str | None = None) -> None:
+        self.bg_color = QColor(bg_color)
+        if text_color is not None:
+            self.text_color = QColor(text_color)
+        else:
+            luminance = (self.bg_color.red() * 0.299 + self.bg_color.green() * 0.587 + self.bg_color.blue() * 0.114)
+            self.text_color = QColor("#FFFFFF") if luminance < 140 else QColor("#1A1A1A")
+        self.update()
+
     def getText(self) -> str:
         return self.text
 

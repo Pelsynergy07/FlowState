@@ -39,9 +39,37 @@ def main() -> None:
     layout.setContentsMargins(28, 28, 28, 28)
     layout.setSpacing(14)
 
-    settings_btn = QPushButton("Open Settings")
-    hud_btn = QPushButton("Show Recording HUD (5s)")
-    hud_processing_btn = QPushButton("Show Processing State (3s)")
+    from flowstate.ui.onboarding import OnboardingDialog
+    from flowstate.ui.tutorial import TutorialDialog
+    from flowstate.ui.icon import build_app_icon
+
+    app.setWindowIcon(build_app_icon())
+
+    onboarding_btn = QPushButton("Preview Onboarding Setup")
+    tutorial_btn = QPushButton("Preview 2-Step Tutorial")
+    settings_btn = QPushButton("Preview Settings Window")
+    hud_btn = QPushButton("Show Recording HUD (4s)")
+    hud_notice_btn = QPushButton("Show No-Speech Notice (3s)")
+
+    class DummyController:
+        def __init__(self):
+            self.config_store = config_store
+            self.hw_name = "NVIDIA GeForce RTX 2070"
+            self.is_gpu = True
+            self.cores = 8
+            from PySide6.QtCore import QObject, Signal
+            class DummySignals(QObject):
+                recording_started = Signal()
+                recording_finished = Signal(str)
+            self.signals = DummySignals()
+
+    def open_onboarding() -> None:
+        dlg = OnboardingDialog(DummyController())
+        dlg.exec()
+
+    def open_tutorial() -> None:
+        dlg = TutorialDialog(DummyController())
+        dlg.exec()
 
     def open_settings() -> None:
         dlg = SettingsWindow(config_store)
@@ -49,21 +77,23 @@ def main() -> None:
 
     def show_hud() -> None:
         hud.show_recording()
-        QTimer.singleShot(5000, hud.hide_recording)
+        QTimer.singleShot(4000, hud.hide_recording)
 
-    def show_processing() -> None:
-        hud.show_recording()
-        hud.show_processing()
-        QTimer.singleShot(3000, hud.hide_recording)
+    def show_notice() -> None:
+        hud.show_notice("No speech detected (check mic)", 3000)
 
+    onboarding_btn.clicked.connect(open_onboarding)
+    tutorial_btn.clicked.connect(open_tutorial)
     settings_btn.clicked.connect(open_settings)
     hud_btn.clicked.connect(show_hud)
-    hud_processing_btn.clicked.connect(show_processing)
+    hud_notice_btn.clicked.connect(show_notice)
 
+    layout.addWidget(onboarding_btn)
+    layout.addWidget(tutorial_btn)
     layout.addWidget(settings_btn)
     layout.addWidget(hud_btn)
-    layout.addWidget(hud_processing_btn)
-    launcher.resize(300, 190)
+    layout.addWidget(hud_notice_btn)
+    launcher.resize(340, 260)
     launcher.show()
 
     sys.exit(app.exec())

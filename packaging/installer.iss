@@ -3,7 +3,7 @@
 ; constants, so this installer is meant to run on any Windows 11 machine.
 
 #define MyAppName "FlowState"
-#define MyAppVersion "0.1.4"
+#define MyAppVersion "0.1.5"
 #define MyAppPublisher "FlowState"
 #define MyAppExeName "FlowState.exe"
 
@@ -38,9 +38,9 @@ PrivilegesRequired=lowest
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-BeveledLabel=SYS.01 // FLOWSTATE SETUP // 100% LOCAL AI
+BeveledLabel=SYS.01 // FLOWSTATE SETUP // v{#MyAppVersion}
 WelcomeLabel1=FlowState Setup
-WelcomeLabel2=Local, offline voice dictation for Windows.%n%n• Real-time speech transcription & smart LLM cleanup%n• Spatial visual context capture with zero cloud telemetry%n• 100% private, on-device AI models%n%nClick Next to proceed with installation.
+WelcomeLabel2=Local, offline voice dictation for Windows.%n%n• Real-time speech transcription & smart LLM cleanup%n• Spatial visual context capture with zero cloud telemetry%n• Private, on-device AI models%n%nClick Next to proceed with installation.
 
 
 [Tasks]
