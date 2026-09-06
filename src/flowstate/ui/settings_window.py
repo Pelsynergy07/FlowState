@@ -1,8 +1,8 @@
 """Settings window: General, Shortcuts, Model, Cleanup, Capture, History.
 
-Airy, minimal styling: warm paper background, hairline borders, generous
-whitespace, Instrument Serif for the page headline, Manrope everywhere
-else, one consistent corner radius across every card/button/input.
+Neo-brutalist & tactile aesthetic: stark black and white palette,
+instrumental typography, Space Mono stamps, 2px solid borders,
+interactive key recording, and 1-click clipboard copying for history.
 """
 
 from __future__ import annotations
@@ -11,19 +11,19 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
-    QCheckBox,
+    QApplication,
     QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSlider,
     QTabWidget,
     QVBoxLayout,
@@ -34,9 +34,11 @@ from .. import __version__, paths
 from ..audio.devices import list_input_devices
 from ..config import ConfigStore
 from ..hotkeys.manager import bindings_conflict
-from ..session.store import list_sessions
+from ..session.store import list_sessions, purge_all_sessions
 from .autostart import set_launch_at_login
-from .theme import build_stylesheet
+from .key_recorder import KeyRecorderWidget
+from .theme import FONT_FAMILY_MONO, build_stylesheet, paint_paper_background
+from .widgets import BrutalistCheckBox, StickerBadge
 
 
 def _eyebrow(text: str) -> QLabel:
@@ -69,6 +71,7 @@ def _card(*widgets: QWidget) -> QFrame:
     frame = QFrame()
     frame.setProperty("role", "card")
     layout = QVBoxLayout(frame)
+    layout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
     layout.setContentsMargins(22, 20, 22, 20)
     layout.setSpacing(12)
     for w in widgets:
@@ -82,20 +85,36 @@ def _open_path(path: Path) -> None:
 
 class SettingsWindow(QDialog):
     def __init__(self, config_store: ConfigStore, on_applied: Callable[[], None] | None = None, controller=None):
-        super().__init__()
+        super().__init__(None, Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
         self.config_store = config_store
         self._on_applied = on_applied
         self._controller = controller
         self.setWindowTitle("FlowState Settings")
         self.setStyleSheet(build_stylesheet())
-        self.resize(620, 560)
+        self.resize(740, 640)
+        self.setMinimumSize(700, 580)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(32, 30, 32, 26)
-        outer.setSpacing(18)
+        outer.setContentsMargins(30, 26, 30, 22)
+        outer.setSpacing(14)
 
-        outer.addWidget(_eyebrow("FlowState / Configuration"))
-        outer.addWidget(_headline("Settings"))
+        # Header with metadata sticker badges
+        header_row = QHBoxLayout()
+        header_title_col = QVBoxLayout()
+        header_title_col.setSpacing(4)
+        header_title_col.addWidget(_eyebrow("SYS.01 // FLOWSTATE CONFIGURATION"))
+        header_title_col.addWidget(_headline("Settings"))
+        header_row.addLayout(header_title_col, 1)
+
+        badge_col = QVBoxLayout()
+        badge_col.setSpacing(4)
+        badge_status = StickerBadge("100% LOCAL AI", bg_color="#000000", text_color="#FFFFFF", is_pill=False)
+        badge_ver = StickerBadge(f"v{__version__} // WIN64", bg_color="#FFFFFF", text_color="#000000", is_pill=False)
+        badge_col.addWidget(badge_status)
+        badge_col.addWidget(badge_ver)
+        header_row.addLayout(badge_col)
+
+        outer.addLayout(header_row)
         outer.addWidget(_rule())
 
         self.tabs = QTabWidget()
@@ -112,11 +131,54 @@ class SettingsWindow(QDialog):
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setProperty("role", "secondary")
         cancel_btn.clicked.connect(self.reject)
-        save_btn = QPushButton("Save")
+        save_btn = QPushButton("Save Changes")
         save_btn.clicked.connect(self._save)
         button_row.addWidget(cancel_btn)
         button_row.addWidget(save_btn)
         outer.addLayout(button_row)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        paint_paper_background(painter, self.rect())
+
+    def bring_to_front(self) -> None:
+        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        try:
+            import ctypes
+            hwnd = int(self.winId())
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+
+            if user32.IsIconic(hwnd):
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            else:
+                user32.ShowWindow(hwnd, 5)  # SW_SHOW
+
+            # Force window to top via HWND_TOPMOST toggle
+            HWND_TOPMOST = -1
+            HWND_NOTOPMOST = -2
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_SHOWWINDOW = 0x0040
+            user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+            user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+
+            fore_hwnd = user32.GetForegroundWindow()
+            fore_thread = user32.GetWindowThreadProcessId(fore_hwnd, None)
+            app_thread = kernel32.GetCurrentThreadId()
+            if fore_thread != app_thread:
+                user32.AttachThreadInput(fore_thread, app_thread, True)
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+                user32.AttachThreadInput(fore_thread, app_thread, False)
+            else:
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
 
     # -- General --------------------------------------------------------
     def _build_general_tab(self) -> QWidget:
@@ -126,8 +188,6 @@ class SettingsWindow(QDialog):
         layout.setContentsMargins(26, 24, 26, 24)
         layout.setSpacing(18)
 
-        layout.addWidget(_muted("Choose the microphone FlowState listens to, and basic behavior."))
-
         self.mic_combo = QComboBox()
         self.mic_combo.addItem("System default", None)
         for d in list_input_devices():
@@ -136,14 +196,11 @@ class SettingsWindow(QDialog):
         self.mic_combo.setCurrentIndex(idx if idx >= 0 else 0)
         layout.addWidget(_card(_eyebrow("01 / Microphone"), self.mic_combo))
 
-        self.launch_at_login = QCheckBox("Launch FlowState when Windows starts")
-        self.launch_at_login.setChecked(cfg.launch_at_login)
-        self.sound_cues = QCheckBox("Play a sound when recording starts/stops")
-        self.sound_cues.setChecked(cfg.sound_cues)
+        self.launch_at_login = BrutalistCheckBox("Launch FlowState automatically when Windows starts", checked=cfg.launch_at_login)
+        self.sound_cues = BrutalistCheckBox("Play acoustic sound cue when recording starts/stops", checked=cfg.sound_cues)
         layout.addWidget(_card(_eyebrow("02 / Behavior"), self.launch_at_login, self.sound_cues))
 
         layout.addStretch(1)
-        layout.addWidget(_muted(f"FlowState v{__version__}"))
         return page
 
     # -- Shortcuts --------------------------------------------------------
@@ -155,21 +212,34 @@ class SettingsWindow(QDialog):
         layout.setSpacing(18)
 
         layout.addWidget(
-            _muted("Push-to-talk records while held. Toggle starts/stops hands-free with one press.")
+            _muted("Click any box or press RECORD, then physically tap the key or combination on your keyboard.")
         )
 
-        self.toggle_edit = QLineEdit(cfg.toggle)
-        self.toggle_edit.setPlaceholderText("e.g. ctrl+shift+space")
-        layout.addWidget(_card(_eyebrow("03 / Toggle Shortcut"), self.toggle_edit))
+        self.toggle_edit = KeyRecorderWidget(cfg.toggle)
+        layout.addWidget(
+            _card(
+                _eyebrow("03 / Toggle Shortcut (Hands-Free)"),
+                self.toggle_edit,
+                _muted("Press once to start dictation, press again to stop and paste transcription."),
+            )
+        )
 
-        self.ptt_edit = QLineEdit(cfg.push_to_talk)
-        self.ptt_edit.setPlaceholderText("e.g. alt_r")
-        layout.addWidget(_card(_eyebrow("04 / Push-to-talk"), self.ptt_edit))
+        self.ptt_edit = KeyRecorderWidget(cfg.push_to_talk)
+        layout.addWidget(
+            _card(
+                _eyebrow("04 / Push-to-Talk Shortcut"),
+                self.ptt_edit,
+                _muted("Hold while speaking. Release key to transcribe and paste immediately."),
+            )
+        )
 
+        btn_row = QHBoxLayout()
         reset_btn = QPushButton("Reset to Defaults")
         reset_btn.setProperty("role", "secondary")
         reset_btn.clicked.connect(self._reset_shortcuts)
-        layout.addWidget(reset_btn)
+        btn_row.addWidget(reset_btn)
+        btn_row.addStretch(1)
+        layout.addLayout(btn_row)
 
         layout.addStretch(1)
         return page
@@ -204,10 +274,6 @@ class SettingsWindow(QDialog):
         return page
 
     def _build_device_status_label(self) -> QLabel:
-        """Live readout of what the ASR model actually loaded on, not just
-        what's configured -- "auto" can silently mean CPU if there's no
-        compatible GPU, and that's worth surfacing plainly rather than
-        leaving the user to infer it from how slow transcription feels."""
         label = QLabel()
         label.setProperty("role", "muted")
         label.setWordWrap(True)
@@ -234,21 +300,15 @@ class SettingsWindow(QDialog):
         layout.setContentsMargins(26, 24, 26, 24)
         layout.setSpacing(18)
 
-        self.vocab_check = QCheckBox("Developer vocabulary pass (github -> GitHub, etc.)")
-        self.vocab_check.setChecked(cfg.vocabulary_enabled)
-        self.grammar_check = QCheckBox("Smart formatting: grammar, lists, tone (local AI model)")
-        self.grammar_check.setChecked(cfg.grammar_enabled)
-        layout.addWidget(
-            _card(
-                _eyebrow("06 / Cleanup Passes"),
-                self.vocab_check,
-                self.grammar_check,
-                _muted(
-                    "Smart formatting turns spoken enumerations into real lists and "
-                    "adapts tone for messages/emails, not just punctuation."
-                ),
-            )
+        self.vocab_check = BrutalistCheckBox(
+            "Vocabulary correction (fixes domain terms, acronyms, and product names)",
+            checked=cfg.vocabulary_enabled,
         )
+        self.grammar_check = BrutalistCheckBox(
+            "Grammar & punctuation polish (removes verbal fillers and stammers)",
+            checked=cfg.grammar_enabled,
+        )
+        layout.addWidget(_card(_eyebrow("06 / Transcript Polish"), self.vocab_check, self.grammar_check))
 
         layout.addStretch(1)
         return page
@@ -262,21 +322,19 @@ class SettingsWindow(QDialog):
         layout.setSpacing(18)
 
         self.capture_mode = QComboBox()
-        self.capture_mode.addItems(["circle", "drag", "off"])
+        self.capture_mode.addItems(["off", "active_window", "full_screen", "manual_drag"])
         self.capture_mode.setCurrentText(cfg.mode)
+        layout.addWidget(_card(_eyebrow("07 / Visual Context Mode"), self.capture_mode))
 
         self.sensitivity_slider = QSlider(Qt.Horizontal)
         self.sensitivity_slider.setRange(0, 100)
         self.sensitivity_slider.setValue(int(cfg.sensitivity * 100))
-
-        layout.addWidget(
-            _card(
-                _eyebrow("07 / Screenshot Capture"),
-                self.capture_mode,
-                _muted("Circle: draw a loop while recording. Drag: hold Ctrl and drag a box."),
-                self.sensitivity_slider,
-            )
+        self.sensitivity_label = QLabel(f"Sensitivity: {cfg.sensitivity:.2f}")
+        self.sensitivity_label.setProperty("role", "mono")
+        self.sensitivity_slider.valueChanged.connect(
+            lambda v: self.sensitivity_label.setText(f"Sensitivity: {v / 100.0:.2f}")
         )
+        layout.addWidget(_card(_eyebrow("Motion Sensitivity Threshold"), self.sensitivity_slider, self.sensitivity_label))
 
         layout.addStretch(1)
         return page
@@ -285,31 +343,248 @@ class SettingsWindow(QDialog):
     def _build_history_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
-        layout.setSpacing(18)
+        layout.setContentsMargins(26, 20, 26, 20)
+        layout.setSpacing(12)
 
-        layout.addWidget(_eyebrow("08 / Recent Sessions"))
-        self.history_list = QListWidget()
-        for folder in list_sessions()[:20]:
-            transcript_path = folder / "transcript.txt"
-            preview = transcript_path.read_text(encoding="utf-8")[:60] if transcript_path.exists() else "(empty)"
-            item = QListWidgetItem(f"{folder.name}  -  {preview}")
-            item.setData(Qt.UserRole, folder)
-            self.history_list.addItem(item)
-        self.history_list.itemDoubleClicked.connect(self._open_history_item)
-        layout.addWidget(self.history_list, 1)
+        # Header action bar
+        top_bar = QHBoxLayout()
+        header_text = QVBoxLayout()
+        header_text.setSpacing(2)
+        header_text.addWidget(_eyebrow("08 / Session History & Clipboard"))
+        header_text.addWidget(_muted("History auto-clears on app restart. Click COPY TEXT to copy any transcript."))
+        top_bar.addLayout(header_text, 1)
 
-        open_folder_btn = QPushButton("Open Sessions Folder")
+        purge_btn = QPushButton("PURGE ALL")
+        purge_btn.setProperty("role", "secondary")
+        purge_btn.setStyleSheet(
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 6px 12px;"
+        )
+        purge_btn.clicked.connect(self._purge_history)
+        top_bar.addWidget(purge_btn)
+
+        open_folder_btn = QPushButton("OPEN FOLDER")
         open_folder_btn.setProperty("role", "secondary")
+        open_folder_btn.setStyleSheet(
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 6px 12px;"
+        )
         open_folder_btn.clicked.connect(lambda: _open_path(paths.sessions_dir()))
-        layout.addWidget(open_folder_btn)
+        top_bar.addWidget(open_folder_btn)
 
+        layout.addLayout(top_bar)
+
+        # Scrollable session cards area
+        self._history_scroll = QScrollArea()
+        self._history_scroll.setWidgetResizable(True)
+        self._history_scroll.setFrameShape(QFrame.NoFrame)
+        self._history_scroll.setStyleSheet(
+            """
+            QScrollArea {
+                background: transparent;
+                border: 2px solid #000000;
+                border-radius: 0px;
+            }
+            """
+        )
+
+        self._history_content = QWidget()
+        self._history_layout = QVBoxLayout(self._history_content)
+        self._history_layout.setContentsMargins(12, 12, 12, 12)
+        self._history_layout.setSpacing(12)
+
+        self._history_scroll.setWidget(self._history_content)
+        layout.addWidget(self._history_scroll, 1)
+
+        self._refresh_history_list()
         return page
 
-    def _open_history_item(self, item: QListWidgetItem) -> None:
-        folder = item.data(Qt.UserRole)
-        if folder:
-            _open_path(folder)
+    def _purge_history(self) -> None:
+        deleted = purge_all_sessions()
+        self._refresh_history_list()
+        QMessageBox.information(self, "FlowState History", f"Purged {len(deleted)} session(s) from history.")
+
+    def _refresh_history_list(self) -> None:
+        # Clear existing cards
+        while self._history_layout.count():
+            item = self._history_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        sessions = list_sessions()[:30]
+        if not sessions:
+            empty_card = QFrame()
+            empty_card.setStyleSheet(
+                """
+                QFrame {
+                    background-color: #FFFFFF;
+                    border: 2px dashed #000000;
+                    border-radius: 0px;
+                    padding: 30px;
+                }
+                """
+            )
+            empty_layout = QVBoxLayout(empty_card)
+            empty_layout.setAlignment(Qt.AlignCenter)
+            empty_title = QLabel("[ NO ACTIVE SESSIONS IN CURRENT RUN ]")
+            empty_title.setStyleSheet(
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 13px; font-weight: 900; color: #000000;"
+            )
+            empty_subtitle = QLabel("Transcriptions recorded during this run will appear here with 1-click copy.")
+            empty_subtitle.setStyleSheet(
+                "font-size: 11px; color: #666666; margin-top: 4px;"
+            )
+            empty_layout.addWidget(empty_title)
+            empty_layout.addWidget(empty_subtitle)
+            self._history_layout.addWidget(empty_card)
+            self._history_layout.addStretch(1)
+            return
+
+        for folder in sessions:
+            transcript_path = folder / "transcript.txt"
+            transcript = transcript_path.read_text(encoding="utf-8").strip() if transcript_path.exists() else ""
+            if not transcript:
+                transcript = "(No transcription recorded)"
+
+            card = QFrame()
+            card.setStyleSheet(
+                """
+                QFrame {
+                    background-color: #FFFFFF;
+                    border: 2px solid #000000;
+                    border-radius: 0px;
+                }
+                """
+            )
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(14, 12, 14, 12)
+            card_layout.setSpacing(8)
+
+            # Card Header
+            card_head = QHBoxLayout()
+            date_str = folder.name
+            try:
+                date_part, time_part, _ = folder.name.split("-", 2)
+                date_str = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:]}  {time_part[:2]}:{time_part[2:4]}:{time_part[4:]}"
+            except Exception:
+                pass
+
+            stamp = QLabel(f"REC // {date_str}")
+            stamp.setStyleSheet(
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; color: #000000;"
+            )
+            card_head.addWidget(stamp, 1)
+
+            folder_btn = QPushButton("EXPLORE")
+            folder_btn.setProperty("role", "secondary")
+            folder_btn.setStyleSheet(
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 800; padding: 3px 8px;"
+            )
+            folder_btn.clicked.connect(lambda _, f=folder: _open_path(f))
+            card_head.addWidget(folder_btn)
+
+            card_layout.addLayout(card_head)
+
+            # Transcript Box
+            text_preview = QPlainTextEdit(transcript)
+            text_preview.setReadOnly(True)
+            text_preview.setStyleSheet(
+                f"""
+                QPlainTextEdit {{
+                    background-color: #FAFAFA;
+                    color: #000000;
+                    border: 1px solid #CCCCCC;
+                    border-radius: 0px;
+                    font-family: {FONT_FAMILY_MONO};
+                    font-size: 11px;
+                    padding: 8px;
+                }}
+                """
+            )
+            # Estimate height based on line count
+            line_count = min(max(2, len(transcript.splitlines()) + (len(transcript) // 70)), 6)
+            text_preview.setFixedHeight(line_count * 20 + 20)
+            card_layout.addWidget(text_preview)
+
+            # Bottom action row
+            action_row = QHBoxLayout()
+            word_count = len(transcript.split())
+            count_lbl = QLabel(f"{word_count} WORDS // {len(transcript)} CHARACTERS")
+            count_lbl.setStyleSheet(
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 700; color: #777777;"
+            )
+            action_row.addWidget(count_lbl, 1)
+
+            copy_btn = QPushButton("COPY TEXT")
+            copy_btn.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background-color: #000000;
+                    color: #FFFFFF;
+                    border: 2px solid #000000;
+                    border-radius: 0px;
+                    font-family: {FONT_FAMILY_MONO};
+                    font-size: 10px;
+                    font-weight: 900;
+                    padding: 6px 14px;
+                }}
+                QPushButton:hover {{
+                    background-color: #222222;
+                }}
+                """
+            )
+
+            def _make_copy_handler(btn: QPushButton, text: str):
+                def _do_copy():
+                    clipboard = QApplication.clipboard()
+                    if clipboard:
+                        clipboard.setText(text)
+                    btn.setText("COPIED!")
+                    btn.setStyleSheet(
+                        f"""
+                        QPushButton {{
+                            background-color: #FFFFFF;
+                            color: #000000;
+                            border: 2px solid #000000;
+                            border-radius: 0px;
+                            font-family: {FONT_FAMILY_MONO};
+                            font-size: 10px;
+                            font-weight: 900;
+                            padding: 6px 14px;
+                        }}
+                        """
+                    )
+                    QTimer.singleShot(1500, lambda: _reset_btn(btn))
+
+                def _reset_btn(b: QPushButton):
+                    b.setText("COPY TEXT")
+                    b.setStyleSheet(
+                        f"""
+                        QPushButton {{
+                            background-color: #000000;
+                            color: #FFFFFF;
+                            border: 2px solid #000000;
+                            border-radius: 0px;
+                            font-family: {FONT_FAMILY_MONO};
+                            font-size: 10px;
+                            font-weight: 900;
+                            padding: 6px 14px;
+                        }}
+                        QPushButton:hover {{
+                            background-color: #222222;
+                        }}
+                        """
+                    )
+
+                return _do_copy
+
+            copy_btn.clicked.connect(_make_copy_handler(copy_btn, transcript))
+            action_row.addWidget(copy_btn)
+
+            card_layout.addLayout(action_row)
+
+            self._history_layout.addWidget(card)
+
+        self._history_layout.addStretch(1)
 
     # -- Save --------------------------------------------------------
     def _save(self) -> None:

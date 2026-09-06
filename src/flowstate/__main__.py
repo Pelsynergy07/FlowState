@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from . import paths
@@ -52,13 +54,60 @@ def main() -> int:
 
     logger = configure_logging()
 
-    lock = _acquire_single_instance_lock()
-    if lock is None:
-        logger.error("FlowState is already running.")
-        return 1
-
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    from PySide6.QtNetwork import QLocalServer, QLocalSocket
+
+    IPC_SERVER_NAME = "FlowStateSingleInstanceIPC"
+
+    # Single-instance guard via Windows named mutex
+    lock = _acquire_single_instance_lock()
+    if lock is None:
+        logger.info("FlowState is already running. Signaling instance to activate window...")
+        try:
+            import ctypes
+            ctypes.windll.user32.AllowSetForegroundWindow(ctypes.c_uint(-1))
+        except Exception:
+            pass
+        test_socket = QLocalSocket()
+        for attempt in range(6):
+            test_socket.connectToServer(IPC_SERVER_NAME)
+            if test_socket.waitForConnected(500):
+                test_socket.write(b"ACTIVATE\n")
+                test_socket.flush()
+                test_socket.waitForBytesWritten(500)
+                test_socket.disconnectFromServer()
+                logger.info("Activation signal sent to running instance.")
+                break
+            time.sleep(0.25)
+        else:
+            logger.warning("Could not connect to IPC server on running instance.")
+        os._exit(0)
+
+    # Start IPC server immediately so any quick subsequent launches connect right away
+    ipc_server = QLocalServer(app)
+    QLocalServer.removeServer(IPC_SERVER_NAME)
+    ipc_server.listen(IPC_SERVER_NAME)
+    logger.info("IPC server listening on %s: %s", IPC_SERVER_NAME, ipc_server.isListening())
+
+    def _handle_ipc_connection():
+        logger.info("Incoming single-instance IPC connection detected.")
+        while ipc_server.hasPendingConnections():
+            conn = ipc_server.nextPendingConnection()
+            if conn:
+                conn.close()
+        open_settings()
+
+    ipc_server.newConnection.connect(_handle_ipc_connection)
+
+    from .session.store import purge_all_sessions
+    try:
+        purge_all_sessions()
+        logger.info("Purged session history on startup.")
+    except Exception as e:
+        logger.warning("Could not purge session history on startup: %s", e)
+
     load_bundled_fonts()
     apply_light_palette(app)
     app.setStyleSheet(build_stylesheet())
@@ -81,10 +130,28 @@ def main() -> int:
     controller.signals.drag_selection_moved.connect(drag_overlay.move_to)
     controller.signals.drag_selection_ended.connect(drag_overlay.end)
 
+    settings_dlg: SettingsWindow | None = None
+
     def open_settings() -> None:
-        dlg = SettingsWindow(controller.config_store, on_applied=controller.apply_config_change, controller=controller)
-        dlg.exec()
-        tray.refresh_recent_sessions()
+        nonlocal settings_dlg
+        logger.info("open_settings invoked. Existing dialog visible: %s", settings_dlg.isVisible() if settings_dlg else False)
+        try:
+            if settings_dlg is not None and settings_dlg.isVisible():
+                settings_dlg.bring_to_front()
+                return
+            settings_dlg = SettingsWindow(
+                controller.config_store,
+                on_applied=controller.apply_config_change,
+                controller=controller,
+            )
+            def _on_closed():
+                nonlocal settings_dlg
+                tray.refresh_recent_sessions()
+            settings_dlg.finished.connect(_on_closed)
+            settings_dlg.bring_to_front()
+            logger.info("SettingsWindow brought to front successfully.")
+        except Exception:
+            logger.error("Failed to open SettingsWindow", exc_info=True)
 
     def do_quit() -> None:
         controller.stop()
@@ -143,6 +210,10 @@ def main() -> int:
     if is_first_run:
         onboarding = OnboardingDialog(controller)
         onboarding.exec()
+    elif "--autostart" not in sys.argv:
+        # If user opened the app explicitly (not silent boot startup), show settings!
+        logger.info("Scheduling initial open_settings()")
+        QTimer.singleShot(100, open_settings)
 
     logger.info(
         "FlowState is running. Toggle: %s  Push-to-talk: %s",

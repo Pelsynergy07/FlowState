@@ -19,6 +19,9 @@ _FONT_FILES = [
     "Manrope-SemiBold.ttf",
     "Manrope-Bold.ttf",
     "Manrope-ExtraBold.ttf",
+    "Syne-Variable.ttf",
+    "SpaceMono-Regular.ttf",
+    "SpaceMono-Bold.ttf",
 ]
 
 _loaded = False
@@ -38,3 +41,17 @@ def load_bundled_fonts() -> None:
                 logger.warning("Failed to register bundled font: %s", filename)
         except Exception:
             logger.warning("Could not load bundled font: %s", filename, exc_info=True)
+
+
+def make_font(family: str, size: int, bold: bool = False, italic: bool = False):
+    """Creates a QFont safely without triggering Shiboken parameter generic type errors on Python 3.12."""
+    from PySide6.QtGui import QFont
+    f = QFont()
+    f.setFamily(family)
+    f.setPointSize(size)
+    if bold:
+        f.setBold(True)
+    if italic:
+        f.setItalic(True)
+    return f
+

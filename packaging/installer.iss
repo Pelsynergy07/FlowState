@@ -34,6 +34,12 @@ PrivilegesRequired=lowest
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Messages]
+BeveledLabel=FlowState // Offline Voice Dictation & Spatial Capture
+WelcomeLabel1=FlowState Setup [REV 02.6]
+WelcomeLabel2=Local, offline voice dictation for Windows.%n%nCleaned transcripts and spatial visual capture with 100% private, on-device AI models. Zero network telemetry.
+
+
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 Name: "launchatlogin"; Description: "Launch FlowState automatically when Windows starts"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
@@ -47,7 +53,7 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FlowState"; ValueData: """{app}\{#MyAppExeName}"""; Tasks: launchatlogin; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FlowState"; ValueData: """{app}\{#MyAppExeName}"" --autostart"; Tasks: launchatlogin; Flags: uninsdeletevalue
 
 [Run]
 ; No skipifsilent: a silent run (VERYSILENT) is exactly what updater.py's

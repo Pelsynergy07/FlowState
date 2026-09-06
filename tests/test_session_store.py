@@ -80,3 +80,16 @@ def test_retention_keeps_everything_under_the_caps(sessions_root):
     assert deleted == []
     assert a.exists()
     assert b.exists()
+
+
+def test_purge_all_sessions(sessions_root):
+    now = datetime.now()
+    a = _make_session_folder(sessions_root, now - timedelta(hours=1), size_bytes=1024, suffix="aaaaaa")
+    b = _make_session_folder(sessions_root, now - timedelta(hours=2), size_bytes=1024, suffix="bbbbbb")
+
+    deleted = store.purge_all_sessions()
+
+    assert len(deleted) == 2
+    assert not a.exists()
+    assert not b.exists()
+    assert store.list_sessions() == []

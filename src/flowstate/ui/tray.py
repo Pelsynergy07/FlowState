@@ -14,6 +14,9 @@ from ..update_check import UpdateInfo
 from .icon import build_tray_icon
 
 
+from .theme import build_stylesheet
+
+
 class TrayController:
     def __init__(
         self,
@@ -30,7 +33,9 @@ class TrayController:
         self.tray_icon.setToolTip("FlowState")
 
         self.menu = QMenu()
+        self.menu.setStyleSheet(build_stylesheet())
         self._toggle_action = self.menu.addAction("Start Listening")
+
         self._toggle_action.triggered.connect(on_toggle_recording)
 
         self.menu.addSeparator()
@@ -56,8 +61,8 @@ class TrayController:
         self.tray_icon.activated.connect(self._on_activated)
 
     def _on_activated(self, reason) -> None:
-        if reason == QSystemTrayIcon.Trigger:
-            self._on_toggle_recording()
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            self._on_open_settings()
 
     def refresh_recent_sessions(self) -> None:
         self.recent_menu.clear()

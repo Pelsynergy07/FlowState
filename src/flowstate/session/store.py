@@ -88,3 +88,12 @@ def enforce_retention(now: datetime | None = None) -> list[Path]:
         deleted.append(oldest)
 
     return deleted
+
+
+def purge_all_sessions() -> list[Path]:
+    """Purge all session folders so history stays clean across app/PC restarts."""
+    deleted: list[Path] = []
+    for folder in list_sessions():
+        shutil.rmtree(folder, ignore_errors=True)
+        deleted.append(folder)
+    return deleted

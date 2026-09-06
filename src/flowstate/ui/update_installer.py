@@ -13,13 +13,16 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QObject, Signal
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QDialog, QLabel, QMessageBox, QProgressBar, QPushButton, QVBoxLayout
 
 from ..update_check import UpdateInfo
 from ..updater import UpdateCancelled, UpdateDownloadError, download_installer, launch_installer_and_exit
-from .theme import build_stylesheet
+from .theme import build_stylesheet, paint_paper_background
+
 
 logger = logging.getLogger("flowstate.updater")
+
 
 
 class _UpdateDownloadWorker(QObject):
@@ -100,7 +103,12 @@ class UpdateInstallDialog(QDialog):
         self._worker.cancelled.connect(self._thread.quit)
         self._thread.start()
 
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        paint_paper_background(painter, self.rect())
+
     def _on_progress(self, done: int, total: int) -> None:
+
         mb_done = done / (1024 * 1024)
         if total:
             self.progress.setRange(0, 100)

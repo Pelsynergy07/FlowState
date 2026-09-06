@@ -96,50 +96,63 @@ class _PreloadWorker(QObject):
         )
 
 
+from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QHBoxLayout
+
+from .theme import LIME, build_stylesheet, paint_paper_background
+from .widgets import StickerBadge
+
+
 class OnboardingDialog(QDialog):
     def __init__(self, controller):
         super().__init__()
         self._controller = controller
         self.setWindowTitle("Welcome to FlowState")
         self.setStyleSheet(build_stylesheet())
-        self.setFixedSize(480, 360)
+        self.setFixedSize(520, 420)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         cfg = controller.config_store.config
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(36, 34, 36, 34)
-        layout.setSpacing(16)
+        layout.setContentsMargins(36, 32, 36, 30)
+        layout.setSpacing(14)
 
-        eyebrow = QLabel("FLOWSTATE / FIRST RUN")
-        eyebrow.setProperty("role", "eyebrow")
+        # Header with sticker chips
+        header_row = QHBoxLayout()
+        badge_step = StickerBadge("SYS.01 // SETUP", bg_color="#0D0D0D", text_color="#FFFFFF")
+        badge_local = StickerBadge("100% LOCAL", bg_color=LIME, text_color="#0D0D0D", is_pill=True)
+        header_row.addWidget(badge_step)
+        header_row.addWidget(badge_local)
+        header_row.addStretch(1)
+        layout.addLayout(header_row)
+
         headline = QLabel("Let's get set up")
         headline.setProperty("role", "headline")
         body = QLabel(
-            f"Default shortcut: {cfg.shortcuts.toggle} to start/stop hands-free, "
-            f"or hold {cfg.shortcuts.push_to_talk} to push-to-talk.\n\n"
-            "FlowState downloads its AI models once (roughly 1.3-2.7GB total "
-            "depending on whether a compatible GPU is found), then runs fully "
-            "offline. This needs an internet connection just for this step. "
-            "You can change the microphone and shortcuts anytime from the "
-            "tray icon's Settings."
+            f"Default shortcuts: {cfg.shortcuts.toggle} to start/stop hands-free, "
+            f"or hold {cfg.shortcuts.push_to_talk} for push-to-talk.\n\n"
+            "FlowState downloads its speech & formatting AI models once "
+            "(~1.3-2.7GB total), then runs completely offline with zero telemetry. "
+            "Microphone, capture sensitivity, and hotkeys can be changed anytime in Settings."
         )
         body.setProperty("role", "muted")
         body.setWordWrap(True)
 
-        self.status_label = QLabel("Ready to set up.")
+        self.status_label = QLabel("Ready to initialize models.")
         self.status_label.setProperty("role", "muted")
         self.status_label.setWordWrap(True)
 
         self.progress = QProgressBar()
+        self.progress.setFixedHeight(22)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.hide()
 
-        self.start_btn = QPushButton("Set Up FlowState")
+        self.start_btn = QPushButton("Initialize & Preload Models")
+        self.start_btn.setFixedHeight(44)
         self.start_btn.clicked.connect(self._start_setup)
 
-        layout.addWidget(eyebrow)
         layout.addWidget(headline)
         layout.addWidget(body)
         layout.addStretch(1)
@@ -149,6 +162,11 @@ class OnboardingDialog(QDialog):
 
         self._thread: QThread | None = None
         self._worker: _PreloadWorker | None = None
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        paint_paper_background(painter, self.rect())
+
 
     def _start_setup(self) -> None:
         self.start_btn.setEnabled(False)
