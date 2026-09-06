@@ -32,7 +32,7 @@ class ShortcutConfig:
 
 @dataclass
 class CaptureConfig:
-    mode: str = "circle"  # "circle" | "drag" | "off"
+    mode: str = "drag"  # "drag" | "circle" | "off"
     sensitivity: float = 0.5  # 0.0 (loose) .. 1.0 (strict), maps to gesture thresholds
 
 

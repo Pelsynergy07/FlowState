@@ -51,8 +51,45 @@ def build_app_icon(size: int = 256) -> QIcon:
 
 
 def build_tray_icon(recording: bool = False) -> QIcon:
-    color = DANGER if recording else ACCENT
+    """Builds a tray icon guaranteed to pop out on both dark and light Windows taskbars."""
     icon = QIcon()
     for s in (16, 24, 32, 48):
-        icon.addPixmap(_draw_mark(s, color))
+        pixmap = QPixmap(s, s)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        rect = QRectF(1.0, 1.0, s - 2.0, s - 2.0)
+        radius = s * 0.22
+
+        if recording:
+            # Vivid Danger Red tile with white waveform
+            painter.setPen(QPen(QColor("#000000"), 1.2))
+            painter.setBrush(QColor(DANGER))
+            painter.drawRoundedRect(rect, radius, radius)
+            bar_color = QColor("#FFFFFF")
+        else:
+            # Clean White tile with solid dark border & deep black waveform
+            painter.setPen(QPen(QColor("#1A1A1A"), 1.4))
+            painter.setBrush(QColor("#FFFFFF"))
+            painter.drawRoundedRect(rect, radius, radius)
+            bar_color = QColor("#1A1A1A")
+
+        bar_w = max(2.0, s * 0.12)
+        gap = max(1.5, s * 0.10)
+        heights = [s * 0.32, s * 0.56, s * 0.40]
+        total_w = bar_w * 3 + gap * 2
+        x = (s - total_w) / 2.0
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(bar_color)
+        for h in heights:
+            y = (s - h) / 2.0
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(x, y, bar_w, h), bar_w / 2.0, bar_w / 2.0)
+            painter.drawPath(path)
+            x += bar_w + gap
+
+        painter.end()
+        icon.addPixmap(pixmap)
     return icon
+

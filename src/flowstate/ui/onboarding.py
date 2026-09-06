@@ -212,16 +212,17 @@ class OnboardingDialog(QDialog):
         self._controller = controller
         self.setWindowTitle("FlowState Setup")
         self.setStyleSheet(build_stylesheet())
-        self.resize(620, 560)
-        self.setMinimumSize(580, 520)
+        self.resize(630, 580)
+        self.setMinimumSize(590, 530)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         cfg = controller.config_store.config
         self.hw_name, self.hw_detail, self.is_gpu, self.cores = _detect_hardware_summary()
+        self.skipped = False
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(32, 28, 32, 24)
-        outer.setSpacing(14)
+        outer.setContentsMargins(32, 26, 32, 22)
+        outer.setSpacing(13)
 
         # 1. Header with sticker badges and subtle geometric star motif
         header_row = QHBoxLayout()
@@ -230,14 +231,15 @@ class OnboardingDialog(QDialog):
         eyebrow_row = QHBoxLayout()
         eyebrow_row.setSpacing(6)
         eyebrow_star = GeometricMotif("star", size=11, color=INK)
-        eyebrow = QLabel("SYS.01 // ONBOARDING & PRELOAD")
+        eyebrow = QLabel("SYS.01 // GETTING STARTED")
         eyebrow.setProperty("role", "eyebrow")
         eyebrow_row.addWidget(eyebrow_star)
         eyebrow_row.addWidget(eyebrow)
         eyebrow_row.addStretch(1)
 
-        headline = QLabel("Welcome to FlowState")
+        headline = QLabel("Speak your mind.\nFlowState handles the rest.")
         headline.setProperty("role", "headline")
+        headline.setFont(make_font(FONT_FAMILY_DISPLAY, 30))
         header_left.addLayout(eyebrow_row)
         header_left.addWidget(headline)
         header_row.addLayout(header_left, 1)
@@ -267,9 +269,16 @@ class OnboardingDialog(QDialog):
         hw_texts.setSpacing(2)
         hw_lbl = QLabel(f"HARDWARE DETECTED: {self.hw_name.upper()}")
         hw_lbl.setFont(make_font(FONT_FAMILY_MONO, 9, bold=True))
-        hw_sub = QLabel(f"{self.hw_detail} • Zero cloud fees, complete offline privacy.")
+
+        if self.is_gpu:
+            hw_desc = f"{self.hw_detail} • CUDA accelerated for instant real-time dictation."
+        else:
+            hw_desc = f"{self.hw_detail} • Standard CPU Mode (AVX2). Initial warmup may take a moment, then runs smoothly."
+
+        hw_sub = QLabel(hw_desc)
         hw_sub.setFont(make_font(FONT_FAMILY, 9))
         hw_sub.setStyleSheet("color: #5C5751;")
+        hw_sub.setWordWrap(True)
         hw_texts.addWidget(hw_lbl)
         hw_texts.addWidget(hw_sub)
         hw_layout.addWidget(hw_icon)
@@ -278,7 +287,7 @@ class OnboardingDialog(QDialog):
         hw_layout.addWidget(hw_cross)
         outer.addWidget(hw_card)
 
-        # 3. Core features with neo-brutalist index badges
+        # 3. Core features with fun, energetic neo-brutalist copy
         features_card = QFrame()
         features_card.setProperty("role", "card")
         f_layout = QVBoxLayout(features_card)
@@ -300,25 +309,25 @@ class OnboardingDialog(QDialog):
             row.addWidget(txt, 1)
             return row
 
-        f_layout.addLayout(_make_bullet("[ 01 ]", f"Push-to-Talk ({cfg.shortcuts.push_to_talk}):", "Hold the shortcut to speak anywhere, release to instantly transcribe."))
-        f_layout.addLayout(_make_bullet("[ 02 ]", f"Hands-Free ({cfg.shortcuts.toggle}):", "Press once to start dictation, press again to stop."))
-        f_layout.addLayout(_make_bullet("[ 03 ]", "100% Offline AI:", "Everything runs locally on your PC. No recordings or keystrokes ever leave your device."))
-        f_layout.addLayout(_make_bullet("[ 04 ]", "One-Time Setup:", "FlowState preloads the speech and formatting models now so future recording is instant."))
+        f_layout.addLayout(_make_bullet("[ 01 ]", f"Speak Freely ({cfg.shortcuts.push_to_talk}):", "Hold the key to unleash your thoughts anywhere, release to paste instantly."))
+        f_layout.addLayout(_make_bullet("[ 02 ]", f"Hands-Free Flow ({cfg.shortcuts.toggle}):", "Tap once for continuous thought capture without holding any buttons."))
+        f_layout.addLayout(_make_bullet("[ 03 ]", "Visual Context (Ctrl + Drag):", "Highlight anything on your screen so the AI sees exactly what you're pointing at."))
+        f_layout.addLayout(_make_bullet("[ 04 ]", "Pure Superpower:", "Fixes punctuation, bullet lists, and phrasing on the fly — 100% private on your device."))
         outer.addWidget(features_card)
 
         # 4. Status & Telemetry section
         status_card = QFrame()
         status_card.setProperty("role", "card")
         s_layout = QVBoxLayout(status_card)
-        s_layout.setContentsMargins(18, 14, 18, 14)
-        s_layout.setSpacing(8)
+        s_layout.setContentsMargins(18, 12, 18, 12)
+        s_layout.setSpacing(7)
 
         status_header_row = QHBoxLayout()
         self.spinner = ActivitySpinner(size=20, color=INK)
         self.spinner.hide()
         status_header_row.addWidget(self.spinner)
 
-        self.status_label = QLabel("Click the button below to initialize & preload local AI models.")
+        self.status_label = QLabel("Click below to warm up local models and start.")
         self.status_label.setFont(make_font(FONT_FAMILY, 10, bold=True))
         self.status_label.setWordWrap(True)
         status_header_row.addWidget(self.status_label, 1)
@@ -340,24 +349,56 @@ class OnboardingDialog(QDialog):
         outer.addWidget(status_card)
         outer.addStretch(1)
 
-        # 5. Faux 3D action button
-        self.start_btn = QPushButton("Initialize && Preload Models")
+        # 5. Action Buttons with Skip Option
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        self.skip_btn = QPushButton("Skip Onboarding →")
+        self.skip_btn.setProperty("role", "secondary")
+        self.skip_btn.setFixedWidth(160)
+        self.skip_btn.setFixedHeight(46)
+        self.skip_btn.setCursor(Qt.PointingHandCursor)
+        self.skip_btn.clicked.connect(self._skip_onboarding)
+        btn_row.addWidget(self.skip_btn)
+
+        self.start_btn = QPushButton("Warm Up Models && Start")
         self.start_btn.setFixedHeight(46)
         self.start_btn.setProperty("role", "primary")
         self.start_btn.setCursor(Qt.PointingHandCursor)
         self.start_btn.clicked.connect(self._start_setup)
-        outer.addWidget(self.start_btn)
+        btn_row.addWidget(self.start_btn, 1)
+
+        outer.addLayout(btn_row)
 
         self._thread: QThread | None = None
         self._worker: _PreloadWorker | None = None
+        self._stamp_pixmap: QPixmap | None = None
+        stamp_path = Path(__file__).parent.parent / "resources" / "icons" / "stamp_seal.png"
+        if stamp_path.exists():
+            self._stamp_pixmap = QPixmap(str(stamp_path))
 
     def paintEvent(self, event):
         painter = QPainter(self)
         paint_paper_background(painter, self.rect())
+        if self._stamp_pixmap and not self._stamp_pixmap.isNull():
+            painter.save()
+            painter.setOpacity(0.13)
+            # Subtle rotated editorial inspection seal in top-right background
+            stamp_sz = 140
+            x = self.width() - stamp_sz - 18
+            y = 10
+            painter.drawPixmap(x, y, stamp_sz, stamp_sz, self._stamp_pixmap)
+            painter.restore()
+
+    def _skip_onboarding(self) -> None:
+        self.skipped = True
+        logger.info("User skipped onboarding.")
+        self.accept()
 
     def _start_setup(self) -> None:
         self.start_btn.setEnabled(False)
-        self.start_btn.setText("Initializing Models...")
+        self.start_btn.setText("Warming Up Models...")
+        self.skip_btn.setEnabled(False)
         self.spinner.show()
         self.progress.setValue(0)
         self.progress.show()
@@ -379,19 +420,22 @@ class OnboardingDialog(QDialog):
 
     def _on_finished(self) -> None:
         self.spinner.hide()
-        self.status_label.setText("All models successfully initialized and ready!")
-        self.telemetry_label.setText("100% of weights verified on local disk & VRAM.")
+        self.status_label.setText("Models ready! FlowState is primed for instant dictation.")
+        self.telemetry_label.setText("100% of weights verified on local disk & memory.")
         self.progress.setValue(100)
-        self.start_btn.setText("CONTINUE TO INTERACTIVE TUTORIAL →")
+        self.start_btn.setText("Open FlowState && Start Tutorial →")
         self.start_btn.setEnabled(True)
+        self.skip_btn.setEnabled(True)
         self.start_btn.clicked.disconnect()
         self.start_btn.clicked.connect(self.accept)
 
     def _on_failed(self, message: str) -> None:
         self.spinner.hide()
-        self.status_label.setText("Setup encountered a network warning, but FlowState can still launch.")
+        self.status_label.setText("Preload encountered a network notice, but FlowState can still launch.")
         self.telemetry_label.setText(f"Details: {message}")
-        self.start_btn.setText("CONTINUE TO TUTORIAL ANYWAY →")
+        self.start_btn.setText("Open FlowState Anyway →")
         self.start_btn.setEnabled(True)
+        self.skip_btn.setEnabled(True)
         self.start_btn.clicked.disconnect()
         self.start_btn.clicked.connect(self.accept)
+

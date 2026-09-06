@@ -8,11 +8,12 @@ interactive key recording, and 1-click clipboard copying for history.
 from __future__ import annotations
 
 import os
+import webbrowser
 from pathlib import Path
 from typing import Callable
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -35,6 +36,8 @@ from ..audio.devices import list_input_devices
 from ..config import ConfigStore
 from ..hotkeys.manager import bindings_conflict
 from ..session.store import list_sessions, purge_all_sessions
+from ..ui.update_notifier import UpdateNotifierSignals, check_for_update_async
+from ..update_check import UpdateInfo
 from .autostart import set_launch_at_login
 from .key_recorder import KeyRecorderWidget
 from .theme import FONT_FAMILY_MONO, build_stylesheet, paint_paper_background
@@ -84,27 +87,45 @@ def _open_path(path: Path) -> None:
 
 
 class SettingsWindow(QDialog):
-    def __init__(self, config_store: ConfigStore, on_applied: Callable[[], None] | None = None, controller=None):
+    def __init__(
+        self,
+        config_store: ConfigStore,
+        on_applied: Callable[[], None] | None = None,
+        controller=None,
+        on_update_requested: Callable[[UpdateInfo], None] | None = None,
+        update_info: UpdateInfo | None = None,
+    ):
         super().__init__(None, Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
         self.config_store = config_store
         self._on_applied = on_applied
         self._controller = controller
+        self._on_update_requested = on_update_requested
+        self._update_info = update_info
         self.setWindowTitle("FlowState Settings")
         self.setStyleSheet(build_stylesheet())
-        self.resize(740, 640)
+        self.resize(760, 640)
         self.setMinimumSize(700, 580)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(30, 26, 30, 22)
         outer.setSpacing(14)
 
-        # Header with metadata sticker badges
+        # Header with metadata sticker badges and authentic textured rubber stamp
         header_row = QHBoxLayout()
         header_title_col = QVBoxLayout()
         header_title_col.setSpacing(4)
         header_title_col.addWidget(_eyebrow("SYS.01 // FLOWSTATE CONFIGURATION"))
         header_title_col.addWidget(_headline("Settings"))
         header_row.addLayout(header_title_col, 1)
+
+        # Subtle rubber stamp seal
+        stamp_path = Path(__file__).parent.parent / "resources" / "icons" / "stamp_seal.png"
+        if stamp_path.exists():
+            stamp_lbl = QLabel()
+            stamp_pix = QPixmap(str(stamp_path)).scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            stamp_lbl.setPixmap(stamp_pix)
+            stamp_lbl.setToolTip("FlowState Verified System Build")
+            header_row.addWidget(stamp_lbl)
 
         badge_col = QVBoxLayout()
         badge_col.setSpacing(4)
@@ -124,6 +145,7 @@ class SettingsWindow(QDialog):
         self.tabs.addTab(self._build_cleanup_tab(), "CLEANUP")
         self.tabs.addTab(self._build_capture_tab(), "CAPTURE")
         self.tabs.addTab(self._build_history_tab(), "HISTORY")
+        self.tabs.addTab(self._build_about_tab(), "ABOUT")
         outer.addWidget(self.tabs, 1)
 
         button_row = QHBoxLayout()
@@ -322,9 +344,16 @@ class SettingsWindow(QDialog):
         layout.setSpacing(18)
 
         self.capture_mode = QComboBox()
-        self.capture_mode.addItems(["off", "active_window", "full_screen", "manual_drag"])
-        self.capture_mode.setCurrentText(cfg.mode)
-        layout.addWidget(_card(_eyebrow("07 / Visual Context Mode"), self.capture_mode))
+        self.capture_mode.addItem("Hold Ctrl and drag", "drag")
+        self.capture_mode.addItem("Click to draw circle", "circle")
+        self.capture_mode.addItem("Off", "off")
+        idx = self.capture_mode.findData(cfg.mode)
+        self.capture_mode.setCurrentIndex(idx if idx >= 0 else 0)
+        layout.addWidget(_card(
+            _eyebrow("07 / Visual Context Highlighting"),
+            self.capture_mode,
+            _muted("Capture screen context alongside audio to clarify code, ambiguous references, and diagrams."),
+        ))
 
         self.sensitivity_slider = QSlider(Qt.Horizontal)
         self.sensitivity_slider.setRange(0, 100)
@@ -349,9 +378,19 @@ class SettingsWindow(QDialog):
         # Header action bar
         top_bar = QHBoxLayout()
         header_text = QVBoxLayout()
-        header_text.setSpacing(2)
+        header_text.setSpacing(4)
         header_text.addWidget(_eyebrow("08 / Session History & Clipboard"))
-        header_text.addWidget(_muted("History auto-clears on app restart. Click COPY TEXT to copy any transcript."))
+
+        # Brutalist callout chips
+        chip_row = QHBoxLayout()
+        chip_row.setSpacing(8)
+        chip_purge = StickerBadge("✦ AUTO-PURGED ON RESTART", bg_color="#FFFFFF", text_color="#000000", is_pill=False)
+        chip_copy = StickerBadge("1-CLICK CLIPBOARD COPY", bg_color="#000000", text_color="#FFFFFF", is_pill=False)
+        chip_row.addWidget(chip_purge)
+        chip_row.addWidget(chip_copy)
+        chip_row.addStretch(1)
+        header_text.addLayout(chip_row)
+
         top_bar.addLayout(header_text, 1)
 
         purge_btn = QPushButton("PURGE ALL")
@@ -474,14 +513,6 @@ class SettingsWindow(QDialog):
             )
             card_head.addWidget(stamp, 1)
 
-            folder_btn = QPushButton("EXPLORE")
-            folder_btn.setProperty("role", "secondary")
-            folder_btn.setStyleSheet(
-                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 800; padding: 3px 8px;"
-            )
-            folder_btn.clicked.connect(lambda _, f=folder: _open_path(f))
-            card_head.addWidget(folder_btn)
-
             card_layout.addLayout(card_head)
 
             # Transcript Box
@@ -586,6 +617,186 @@ class SettingsWindow(QDialog):
 
         self._history_layout.addStretch(1)
 
+    # -- About --------------------------------------------------------
+    def _build_about_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(26, 24, 26, 24)
+        layout.setSpacing(16)
+
+        # 1. Developer Profile Card
+        dev_card = QFrame()
+        dev_card.setProperty("role", "card")
+        dev_card_layout = QHBoxLayout(dev_card)
+        dev_card_layout.setContentsMargins(20, 18, 20, 18)
+        dev_card_layout.setSpacing(20)
+
+        # Pixel art avatar
+        avatar_lbl = QLabel()
+        avatar_path = Path(__file__).parent.parent / "resources" / "icons" / "pelsynergy_avatar.png"
+        if avatar_path.exists():
+            avatar_pix = QPixmap(str(avatar_path)).scaled(88, 88, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            avatar_lbl.setPixmap(avatar_pix)
+        else:
+            avatar_lbl.setFixedSize(88, 88)
+        avatar_lbl.setStyleSheet("border: 2px solid #000000; background-color: #FFFFFF;")
+        dev_card_layout.addWidget(avatar_lbl)
+
+        # Info column
+        info_col = QVBoxLayout()
+        info_col.setSpacing(6)
+        info_col.addWidget(_eyebrow("CREATOR & ARCHITECT"))
+
+        author_name = QLabel("Developed with love by Pelsynergy")
+        author_name.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 15px; font-weight: 900; color: #000000;")
+        info_col.addWidget(author_name)
+
+        bio_lbl = QLabel(
+            "Crafting high-speed, local-first tactile AI systems with zero telemetries and zero latency."
+        )
+        bio_lbl.setProperty("role", "muted")
+        bio_lbl.setWordWrap(True)
+        info_col.addWidget(bio_lbl)
+
+        # Social & portfolio link buttons
+        links_row = QHBoxLayout()
+        links_row.setSpacing(8)
+
+        def _make_link_btn(text: str, url: str) -> QPushButton:
+            btn = QPushButton(text)
+            btn.setProperty("role", "secondary")
+            btn.setStyleSheet(
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 900; padding: 5px 10px;"
+            )
+            btn.clicked.connect(lambda: webbrowser.open(url))
+            return btn
+
+        links_row.addWidget(_make_link_btn("🌐 PORTFOLIO", "https://pelsynergy.framer.website/"))
+        links_row.addWidget(_make_link_btn("💼 LINKEDIN", "https://www.linkedin.com/in/pranav-kumar-95708723b/"))
+        links_row.addWidget(_make_link_btn("🐙 GITHUB", "https://github.com/Pelsynergy07/FlowState"))
+        links_row.addStretch(1)
+        info_col.addLayout(links_row)
+
+        dev_card_layout.addLayout(info_col, 1)
+        layout.addWidget(dev_card)
+
+        # 2. Release & Updates Card
+        update_card = QFrame()
+        update_card.setProperty("role", "card")
+        update_card_layout = QVBoxLayout(update_card)
+        update_card_layout.setContentsMargins(20, 18, 20, 18)
+        update_card_layout.setSpacing(10)
+
+        update_card_layout.addWidget(_eyebrow("09 / SYSTEM VERSION & LIVE UPDATES"))
+
+        ver_row = QHBoxLayout()
+        ver_lbl = QLabel(f"FlowState v{__version__} // Windows Native x64")
+        ver_lbl.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 12px; font-weight: 800; color: #000000;")
+        ver_row.addWidget(ver_lbl, 1)
+
+        self._check_update_btn = QPushButton("CHECK FOR UPDATES")
+        self._check_update_btn.setProperty("role", "secondary")
+        self._check_update_btn.setStyleSheet(
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 6px 14px;"
+        )
+        self._check_update_btn.clicked.connect(self._manual_check_updates)
+        ver_row.addWidget(self._check_update_btn)
+        update_card_layout.addLayout(ver_row)
+
+        # Status text & Install button container
+        self._update_status_lbl = QLabel("Ready to check for updates.")
+        self._update_status_lbl.setProperty("role", "muted")
+        update_card_layout.addWidget(self._update_status_lbl)
+
+        self._update_action_box = QFrame()
+        self._update_action_box.setStyleSheet(
+            """
+            QFrame {
+                background-color: #000000;
+                border: 2px solid #000000;
+            }
+            QLabel {
+                color: #FFFFFF;
+                background-color: transparent;
+            }
+            """
+        )
+        act_layout = QHBoxLayout(self._update_action_box)
+        act_layout.setContentsMargins(16, 12, 16, 12)
+        act_layout.setSpacing(12)
+
+        self._update_banner_lbl = QLabel("NEW VERSION AVAILABLE!")
+        self._update_banner_lbl.setStyleSheet(
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 11px; font-weight: 900; color: #FFFFFF; background-color: transparent;"
+        )
+        act_layout.addWidget(self._update_banner_lbl, 1)
+
+        self._update_now_btn = QPushButton("INSTALL UPDATE NOW →")
+        self._update_now_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: #FFFFFF;
+                color: #000000;
+                border: 2px solid #000000;
+                border-radius: 0px;
+                font-family: {FONT_FAMILY_MONO};
+                font-size: 10px;
+                font-weight: 900;
+                padding: 6px 14px;
+            }}
+            QPushButton:hover {{
+                background-color: #EEEEEE;
+            }}
+            """
+        )
+        self._update_now_btn.clicked.connect(self._trigger_update_install)
+        act_layout.addWidget(self._update_now_btn)
+
+        self._update_action_box.hide()
+        update_card_layout.addWidget(self._update_action_box)
+
+        layout.addWidget(update_card)
+
+        # Populate initial status
+        self.set_update_info(self._update_info)
+
+        layout.addStretch(1)
+        return page
+
+    def set_update_info(self, info: UpdateInfo | None) -> None:
+        self._update_info = info
+        if not hasattr(self, "_update_status_lbl"):
+            return
+        if info is None:
+            self._update_status_lbl.setText(f"FlowState is up to date (v{__version__}).")
+            self._update_action_box.hide()
+        else:
+            self._update_status_lbl.setText(f"Release v{info.version} is ready for installation.")
+            self._update_banner_lbl.setText(f"✦ UPDATE READY: v{info.version}")
+            self._update_action_box.show()
+
+    def _manual_check_updates(self) -> None:
+        self._check_update_btn.setEnabled(False)
+        self._check_update_btn.setText("CHECKING...")
+        self._update_status_lbl.setText("Connecting to GitHub Releases...")
+
+        signals = UpdateNotifierSignals()
+
+        def _on_checked(info: UpdateInfo | None):
+            self._check_update_btn.setEnabled(True)
+            self._check_update_btn.setText("CHECK FOR UPDATES")
+            self.set_update_info(info)
+            if info is None:
+                self._update_status_lbl.setText(f"You are running the latest release (v{__version__}).")
+
+        signals.checked.connect(_on_checked)
+        check_for_update_async(signals)
+
+    def _trigger_update_install(self) -> None:
+        if self._update_info and self._on_update_requested:
+            self.accept()
+            self._on_update_requested(self._update_info)
+
     # -- Save --------------------------------------------------------
     def _save(self) -> None:
         cfg = self.config_store.config
@@ -617,7 +828,7 @@ class SettingsWindow(QDialog):
         cfg.cleanup.vocabulary_enabled = self.vocab_check.isChecked()
         cfg.cleanup.grammar_enabled = self.grammar_check.isChecked()
 
-        cfg.capture.mode = self.capture_mode.currentText()
+        cfg.capture.mode = self.capture_mode.currentData() or "drag"
         cfg.capture.sensitivity = self.sensitivity_slider.value() / 100.0
 
         self.config_store.save()

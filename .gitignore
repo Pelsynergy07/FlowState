@@ -7,6 +7,7 @@ dist/
 *.egg-info/
 packaging/build/
 packaging/dist/
+packaging/dist_installer/
 *.exe
 *.log
 .vscode/

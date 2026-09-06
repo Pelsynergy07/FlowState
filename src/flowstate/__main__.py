@@ -131,6 +131,7 @@ def main() -> int:
     controller.signals.drag_selection_ended.connect(drag_overlay.end)
 
     settings_dlg: SettingsWindow | None = None
+    current_update_info: UpdateInfo | None = None
 
     def open_settings() -> None:
         nonlocal settings_dlg
@@ -143,6 +144,8 @@ def main() -> int:
                 controller.config_store,
                 on_applied=controller.apply_config_change,
                 controller=controller,
+                on_update_requested=start_update,
+                update_info=current_update_info,
             )
             def _on_closed():
                 nonlocal settings_dlg
@@ -195,8 +198,15 @@ def main() -> int:
 
     tray.show()
 
+    def _handle_update_checked(info: UpdateInfo | None) -> None:
+        nonlocal current_update_info
+        current_update_info = info
+        tray.set_update_available(info)
+        if settings_dlg is not None and settings_dlg.isVisible():
+            settings_dlg.set_update_info(info)
+
     update_signals = UpdateNotifierSignals()
-    update_signals.checked.connect(tray.set_update_available)
+    update_signals.checked.connect(_handle_update_checked)
     check_for_update_async(update_signals)
 
     is_first_run = not paths.first_run_flag_path().exists()
@@ -211,10 +221,15 @@ def main() -> int:
         from .ui.tutorial import TutorialDialog
         onboarding = OnboardingDialog(controller)
         onboarding.exec()
-        tutorial = TutorialDialog(controller)
-        tutorial.exec()
-        logger.info("Scheduling initial open_settings() after tutorial completion")
-        QTimer.singleShot(200, open_settings)
+        if onboarding.skipped:
+            paths.first_run_flag_path().write_text("done", encoding="utf-8")
+            logger.info("User skipped onboarding. Opening settings directly.")
+            QTimer.singleShot(150, open_settings)
+        else:
+            tutorial = TutorialDialog(controller)
+            tutorial.exec()
+            logger.info("Scheduling initial open_settings() after tutorial completion")
+            QTimer.singleShot(200, open_settings)
     elif "--autostart" not in sys.argv:
         # If user opened the app explicitly (not silent boot startup), show settings!
         logger.info("Scheduling initial open_settings()")

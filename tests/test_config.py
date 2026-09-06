@@ -7,7 +7,7 @@ def test_default_config_has_expected_shape():
     cfg = FlowStateConfig()
     assert cfg.version == 1
     assert cfg.shortcuts.toggle == "ctrl+shift+space"
-    assert cfg.capture.mode == "circle"
+    assert cfg.capture.mode == "drag"
     assert cfg.model.asr_model_id == "large-v3-turbo"
 
 
@@ -46,10 +46,10 @@ def test_save_notifies_subscribers(tmp_path):
     seen = []
     store.subscribe(lambda cfg: seen.append(cfg.capture.mode))
 
-    store.config.capture.mode = "drag"
+    store.config.capture.mode = "circle"
     store.save()
 
-    assert seen == ["drag"]
+    assert seen == ["circle"]
 
 
 def test_config_to_dict_is_json_serializable(tmp_path):

@@ -65,8 +65,27 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 ; always user-initiated from inside the app, so auto-launch is wanted.
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
 
-; Deliberately no [UninstallDelete] for %LOCALAPPDATA%\FlowState: the
-; downloaded AI models (1-2GB) and session history live there, and
-; silently deleting them on every uninstall (e.g. during a reinstall/
-; upgrade) would be a bad default. They're left behind for the user to
-; remove by hand if they want, same as most apps handle user data.
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  DataDir: String;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    DataDir := ExpandConstant('{localappdata}\{#MyAppName}');
+    if DirExists(DataDir) then
+    begin
+      if not UninstallSilent then
+      begin
+        if MsgBox('Do you also want to delete all downloaded AI models and settings from ' + DataDir + '?' + #13#10 + #13#10 + 'This will free ~4 GB of disk space.', mbConfirmation, MB_YESNO or MB_DEFBUTTON1) = idYes then
+        begin
+          DelTree(DataDir, True, True, True);
+        end;
+      end
+      else
+      begin
+        // In silent mode, leave data intact unless explicitly requested
+      end;
+    end;
+  end;
+end;
