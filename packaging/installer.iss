@@ -20,12 +20,15 @@ AppMutex=Global\FlowStateSingleInstance
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+DisableDirPage=yes
 OutputDir=dist_installer
 OutputBaseFilename=FlowStateSetup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=app_icon.ico
+WizardSmallImageFile=wizard_small.bmp
+WizardImageFile=wizard_large.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -35,9 +38,9 @@ PrivilegesRequired=lowest
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-BeveledLabel=FlowState // Offline Voice Dictation & Spatial Capture
-WelcomeLabel1=FlowState Setup [REV 02.6]
-WelcomeLabel2=Local, offline voice dictation for Windows.%n%nCleaned transcripts and spatial visual capture with 100% private, on-device AI models. Zero network telemetry.
+BeveledLabel=SYS.01 // FLOWSTATE SETUP // 100% LOCAL AI
+WelcomeLabel1=FlowState Setup
+WelcomeLabel2=Local, offline voice dictation for Windows.%n%n• Real-time speech transcription & smart LLM cleanup%n• Spatial visual context capture with zero cloud telemetry%n• 100% private, on-device AI models%n%nClick Next to proceed with installation.
 
 
 [Tasks]

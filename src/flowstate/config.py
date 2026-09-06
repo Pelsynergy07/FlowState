@@ -21,13 +21,13 @@ CONFIG_VERSION = 1
 class GeneralConfig:
     microphone_device: str | None = None  # None = system default input device
     launch_at_login: bool = False
-    sound_cues: bool = True
+    sound_cues: bool = False
 
 
 @dataclass
 class ShortcutConfig:
     toggle: str = "ctrl+shift+space"
-    push_to_talk: str = "alt_r"
+    push_to_talk: str = "ctrl+m"
 
 
 @dataclass

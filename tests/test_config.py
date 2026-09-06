@@ -29,7 +29,7 @@ def test_missing_fields_fall_back_to_defaults():
     raw = {"version": 1, "shortcuts": {"toggle": "ctrl+space"}}
     cfg = config_from_dict(raw)
     assert cfg.shortcuts.toggle == "ctrl+space"
-    assert cfg.shortcuts.push_to_talk == "alt_r"  # default filled in
+    assert cfg.shortcuts.push_to_talk == "ctrl+m"  # default filled in
     assert cfg.cleanup.grammar_enabled is True  # whole missing section defaulted
 
 

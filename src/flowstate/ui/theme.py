@@ -15,22 +15,22 @@ from pathlib import Path
 from PySide6.QtGui import QColor, QPalette, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication
 
-# -- Color tokens (Stark Black & White Neo-Brutalist) -----------------------
-PAPER = "#FFFFFF"         # Crisp pure white base
-PAPER_RAISED = "#FFFFFF"  # Pure white card surface
-PAPER_ALT = "#F5F5F5"     # Subtle light grey panel surface
-INK = "#000000"           # Pure deep black ink
-MUTED_TEXT = "#666666"    # Technical muted grey
-LINE = "#E0E0E0"          # Structural dividers
-LINE_STRONG = "#000000"   # Bold 2px ink structure
-BORDER = "#000000"        # 2px solid black borders
-ACCENT = "#000000"        # Stark monochrome accent
-ACCENT_SOFT = "#F0F0F0"   # Light grey hover
-LIME = "#000000"          # High-contrast indicator
-ORANGE = "#000000"        # High-contrast indicator
-PINK = "#000000"          # High-contrast indicator
-YELLOW = "#F5F5F5"        # High-contrast badge background
-DANGER = "#000000"
+# -- Color tokens (Warm Vintage Cream & Deep Ink Neo-Brutalist) -------------
+PAPER = "#F6F2EC"         # Warm vintage newsprint cream canvas
+PAPER_RAISED = "#FFFFFF"  # Clean white card surface
+PAPER_ALT = "#EFE8DC"     # Tactile paper / button press tone
+INK = "#1A1A1A"           # Deep charcoal black ink
+MUTED_TEXT = "#5C5751"    # Warm technical grey
+LINE = "#D8D2C6"          # Warm structural dividers
+LINE_STRONG = "#1A1A1A"   # Bold 2.5px ink structure
+BORDER = "#1A1A1A"        # Bold 2.5px solid black borders
+ACCENT = "#1A1A1A"        # Deep black accent
+ACCENT_SOFT = "#EFE8DC"   # Warm hover surface
+LIME = "#D6FF38"          # High-contrast lime badge
+ORANGE = "#FF6B35"        # High-contrast indicator
+PINK = "#FF3366"          # High-contrast indicator
+YELLOW = "#FFE500"        # Warm brutalist yellow
+DANGER = "#D32F2F"
 
 # -- Typography ---------------------------------------------------------
 FONT_FAMILY = "Manrope"                 # Standard UI controls and prose
@@ -38,9 +38,9 @@ FONT_FAMILY_DISPLAY = "Instrument Serif" # Headlines, wordmark, timer counter
 FONT_FAMILY_STICKER = "Syne"            # Expressive neo-brutalist tabs & stickers
 FONT_FAMILY_MONO = "Space Mono"         # Technical stamps and metadata
 
-# Sharp neo-brutalist geometry
-RADIUS = 0
-RADIUS_HUD = 0
+# Tactile neo-brutalist geometry
+RADIUS = 6
+RADIUS_HUD = 8
 
 _paper_pixmap: QPixmap | None = None
 
@@ -50,7 +50,7 @@ def get_paper_texture() -> QPixmap | None:
 
 
 def paint_paper_background(painter: QPainter, rect, base_color: QColor | str = PAPER, opacity: float = 1.0) -> None:
-    """Paints a crisp, clean neo-brutalist stark white background with zero muddy tint."""
+    """Paints a crisp, warm neo-brutalist vintage cream paper background."""
     painter.save()
     painter.fillRect(rect, QColor(base_color))
     painter.restore()
@@ -59,7 +59,7 @@ def paint_paper_background(painter: QPainter, rect, base_color: QColor | str = P
 
 
 def apply_light_palette(app) -> None:
-    """Forces the stark monochrome neo-brutalist palette."""
+    """Forces the warm vintage cream neo-brutalist palette."""
     palette = QPalette()
     palette.setColor(QPalette.Window, QColor(PAPER))
     palette.setColor(QPalette.WindowText, QColor(INK))
@@ -77,6 +77,8 @@ def apply_light_palette(app) -> None:
 
 
 def build_stylesheet() -> str:
+    arrow_path = (Path(__file__).parent.parent / "resources" / "icons" / "arrow_down.svg").as_posix()
+
     return f"""
     * {{
         font-family: "{FONT_FAMILY}";
@@ -100,7 +102,7 @@ def build_stylesheet() -> str:
     QLabel[role="eyebrow"] {{
         color: {MUTED_TEXT};
         font-family: "{FONT_FAMILY_MONO}";
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 700;
         letter-spacing: 1.5px;
     }}
@@ -115,23 +117,29 @@ def build_stylesheet() -> str:
     QLabel[role="muted"] {{
         color: {MUTED_TEXT};
         font-size: 13px;
+        line-height: 1.4;
     }}
 
     QFrame[role="card"] {{
         background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
+        border: 2.5px solid {BORDER};
+        border-right: 4px solid {BORDER};
+        border-bottom: 4px solid {BORDER};
         border-radius: {RADIUS}px;
     }}
 
     QFrame[role="rule"] {{
         background-color: {LINE};
-        max-height: 1px;
-        min-height: 1px;
+        max-height: 1.5px;
+        min-height: 1.5px;
         border: none;
     }}
 
     QTabWidget::pane {{
-        border: 2px solid {BORDER};
+        border: 2.5px solid {BORDER};
+        border-right: 4px solid {BORDER};
+        border-bottom: 4px solid {BORDER};
+        border-radius: {RADIUS}px;
         background-color: {PAPER_RAISED};
         top: -2px;
     }}
@@ -146,6 +154,8 @@ def build_stylesheet() -> str:
         padding: 9px 12px;
         border: 2px solid {BORDER};
         border-bottom: 2px solid {BORDER};
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
         margin-right: 4px;
     }}
 
@@ -155,57 +165,92 @@ def build_stylesheet() -> str:
 
     QTabBar::tab:selected {{
         background: {INK};
-        color: {PAPER_RAISED};
+        color: #FFFFFF;
         border-bottom: 2px solid {INK};
     }}
 
+    /* Faux 3D Neo-Brutalist Buttons */
     QPushButton {{
-        background-color: {INK};
-        color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
+        background-color: #FFFFFF;
+        color: {INK};
+        border: 2.5px solid {BORDER};
+        border-right: 4px solid {BORDER};
+        border-bottom: 4px solid {BORDER};
         border-radius: {RADIUS}px;
-        padding: 10px 20px;
+        padding: 9px 20px;
         font-family: "{FONT_FAMILY_STICKER}";
         font-weight: 700;
-        font-size: 11.5px;
+        font-size: 12px;
         letter-spacing: 0.5px;
     }}
 
     QPushButton:hover {{
-        background-color: #262626;
-        border-color: {BORDER};
+        background-color: #FAF6EF;
+        border-right: 4.5px solid {BORDER};
+        border-bottom: 4.5px solid {BORDER};
+    }}
+
+    QPushButton:pressed {{
+        background-color: {PAPER_ALT};
+        margin-top: 2px;
+        margin-left: 2px;
+        border-right: 2px solid {BORDER};
+        border-bottom: 2px solid {BORDER};
     }}
 
     QPushButton:disabled {{
-        background-color: #E0E0E0;
-        color: #999999;
-        border-color: #CCCCCC;
+        background-color: #E6E1D8;
+        color: #9C968D;
+        border: 2px solid #C4BEB4;
+        border-right: 2px solid #C4BEB4;
+        border-bottom: 2px solid #C4BEB4;
     }}
 
     QPushButton[role="secondary"] {{
-        background-color: {PAPER_RAISED};
+        background-color: #FFFFFF;
         color: {INK};
         border: 2px solid {BORDER};
+        border-right: 3.5px solid {BORDER};
+        border-bottom: 3.5px solid {BORDER};
     }}
 
     QPushButton[role="secondary"]:hover {{
+        background-color: #FAF6EF;
+    }}
+
+    QPushButton[role="secondary"]:pressed {{
         background-color: {PAPER_ALT};
-        border-color: {BORDER};
+        margin-top: 2px;
+        margin-left: 2px;
+        border-right: 2px solid {BORDER};
+        border-bottom: 2px solid {BORDER};
     }}
 
-    QPushButton[role="accent"] {{
+    QPushButton[role="accent"], QPushButton[role="primary"] {{
         background-color: {INK};
-        color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
+        color: #FFFFFF;
+        border: 2.5px solid {BORDER};
+        border-right: 4px solid #000000;
+        border-bottom: 4px solid #000000;
     }}
 
-    QPushButton[role="accent"]:hover {{
-        background-color: #262626;
+    QPushButton[role="accent"]:hover, QPushButton[role="primary"]:hover {{
+        background-color: #2D2D2D;
     }}
 
-    QLineEdit, QSpinBox {{
+    QPushButton[role="accent"]:pressed, QPushButton[role="primary"]:pressed {{
+        background-color: #000000;
+        margin-top: 2px;
+        margin-left: 2px;
+        border-right: 2px solid #000000;
+        border-bottom: 2px solid #000000;
+    }}
+
+    QLineEdit, QSpinBox, QTextEdit, QPlainTextEdit {{
         background-color: {PAPER_RAISED};
         border: 2px solid {BORDER};
+        border-right: 3px solid {BORDER};
+        border-bottom: 3px solid {BORDER};
         border-radius: {RADIUS}px;
         padding: 8px 12px;
         font-size: 13px;
@@ -214,37 +259,55 @@ def build_stylesheet() -> str:
         selection-color: {PAPER_RAISED};
     }}
 
-    QLineEdit:focus, QSpinBox:focus {{
-        border: 2px solid {BORDER};
+    QLineEdit:focus, QSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {{
+        border: 2.5px solid {BORDER};
+        border-right: 3.5px solid {BORDER};
+        border-bottom: 3.5px solid {BORDER};
         outline: none;
     }}
 
-    /* QComboBox and Dropdown List View */
+    /* QComboBox and Dropdown List View (Image 4 reference style) */
     QComboBox {{
         background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
+        border: 2.5px solid {BORDER};
+        border-right: 3.5px solid {BORDER};
+        border-bottom: 3.5px solid {BORDER};
         border-radius: {RADIUS}px;
         padding: 8px 12px;
+        padding-right: 36px;
         font-size: 13px;
+        font-weight: 600;
         color: {INK};
     }}
 
     QComboBox:hover {{
-        border: 2px solid {BORDER};
+        background-color: #FAF6EF;
     }}
 
     QComboBox::drop-down {{
-        border-left: 2px solid {BORDER};
-        width: 30px;
-        background: {PAPER_ALT};
+        subcontrol-origin: padding;
+        subcontrol-position: top right;
+        width: 28px;
+        background-color: {INK};
+        border-left: 2.5px solid {BORDER};
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }}
+
+    QComboBox::down-arrow {{
+        image: url("{arrow_path}");
+        width: 10px;
+        height: 6px;
     }}
 
     QComboBox QAbstractItemView {{
         background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
+        border: 2.5px solid {BORDER};
+        border-right: 4px solid {BORDER};
+        border-bottom: 4px solid {BORDER};
         color: {INK};
         selection-background-color: {INK};
-        selection-color: {PAPER_RAISED};
+        selection-color: #FFFFFF;
         outline: none;
         padding: 4px;
         font-size: 13px;

@@ -69,29 +69,43 @@ class BrutalistCheckBox(QAbstractButton):
 
 
 class StickerBadge(QWidget):
-    """Graphic sticker badge for status chips and revision numbers."""
+    """Graphic sticker badge for status chips and revision numbers with guaranteed high contrast."""
 
     def __init__(
         self,
         text: str,
         bg_color: QColor | str = BORDER,
-        text_color: QColor | str = PAPER_RAISED,
+        text_color: QColor | str | None = None,
         is_pill: bool = False,
         parent=None,
     ):
         super().__init__(parent)
         self.text = text
         self.bg_color = QColor(bg_color)
-        self.text_color = QColor(text_color)
+        if text_color is not None:
+            self.text_color = QColor(text_color)
+        else:
+            # Auto high contrast: if bg is dark, text is pure white; if light, text is dark ink
+            luminance = (self.bg_color.red() * 0.299 + self.bg_color.green() * 0.587 + self.bg_color.blue() * 0.114)
+            self.text_color = QColor("#FFFFFF") if luminance < 140 else QColor("#1A1A1A")
+
         self.is_pill = is_pill
         self.setFixedHeight(24)
+
+    def setText(self, text: str) -> None:
+        self.text = text
+        self.updateGeometry()
+        self.update()
+
+    def getText(self) -> str:
+        return self.text
 
     def sizeHint(self):
         from PySide6.QtCore import QSize
         from PySide6.QtGui import QFontMetrics
-        font = make_font(FONT_FAMILY_MONO, 7, bold=True)
+        font = make_font(FONT_FAMILY_MONO, 7.5, bold=True)
         fm = QFontMetrics(font)
-        w = max(70, fm.horizontalAdvance(self.text) + 24)
+        w = max(72, fm.horizontalAdvance(self.text) + 20)
         return QSize(w, 24)
 
     def paintEvent(self, event):
@@ -99,28 +113,128 @@ class StickerBadge(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         rect = QRectF(1, 1, self.width() - 3, self.height() - 3)
-        radius = rect.height() / 2 if self.is_pill else 0
+        radius = rect.height() / 2 if self.is_pill else 3
 
-        # Shadow
+        # 3D Hard offset drop shadow
         shadow_rect = QRectF(2.5, 2.5, rect.width(), rect.height())
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(0, 0, 0, 160))
+        painter.setBrush(QColor(0, 0, 0, 200))
         if self.is_pill:
             painter.drawRoundedRect(shadow_rect, radius, radius)
         else:
-            painter.drawRect(shadow_rect)
+            painter.drawRoundedRect(shadow_rect, radius, radius)
 
-        # Face
-        painter.setPen(QPen(QColor(BORDER), 1.5))
+        # Surface & border
+        painter.setPen(QPen(QColor(BORDER), 1.8))
         painter.setBrush(self.bg_color)
-        if self.is_pill:
-            painter.drawRoundedRect(rect, radius, radius)
-        else:
-            painter.drawRect(rect)
+        painter.drawRoundedRect(rect, radius, radius)
 
         # Text
         painter.setPen(self.text_color)
-        font = make_font(FONT_FAMILY_MONO, 7, bold=True)
+        font = make_font(FONT_FAMILY_MONO, 7.5, bold=True)
         painter.setFont(font)
         painter.drawText(rect, Qt.AlignCenter, self.text)
         painter.end()
+
+
+import math
+from PySide6.QtCore import QTimer
+
+
+class ActivitySpinner(QWidget):
+    """Continuous rotating geometric neo-brutalist activity indicator."""
+
+    def __init__(self, size: int = 22, color: QColor | str = BORDER, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(size, size)
+        self._color = QColor(color)
+        self._angle = 0
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._rotate)
+        self._timer.start(40)
+
+    def _rotate(self):
+        self._angle = (self._angle + 20) % 360
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        center = QPointF(self.width() / 2.0, self.height() / 2.0)
+        painter.translate(center)
+        painter.rotate(self._angle)
+
+        spoke_count = 8
+        radius_outer = (self.width() / 2.0) - 2.0
+        radius_inner = radius_outer * 0.42
+
+        for i in range(spoke_count):
+            angle = i * (360.0 / spoke_count)
+            # Smooth trailing alpha sweep
+            alpha = int(45 + (210 * ((i + 1) / spoke_count)))
+            c = QColor(self._color)
+            c.setAlpha(alpha)
+            painter.setPen(QPen(c, 2.4, Qt.SolidLine, Qt.SquareCap))
+            rad = math.radians(angle)
+            p1 = QPointF(radius_inner * math.cos(rad), radius_inner * math.sin(rad))
+            p2 = QPointF(radius_outer * math.cos(rad), radius_outer * math.sin(rad))
+            painter.drawLine(p1, p2)
+
+        painter.end()
+
+
+class GeometricMotif(QWidget):
+    """Subtle neo-brutalist geometric decorative motif (star, crosshair, dot-grid)."""
+
+    def __init__(
+        self,
+        motif: str = "star",
+        size: int = 16,
+        color: QColor | str = INK,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.motif = motif
+        self.setFixedSize(size, size)
+        self.color = QColor(color)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        w = self.width()
+        h = self.height()
+        cx = w / 2.0
+        cy = h / 2.0
+
+        if self.motif == "star":
+            # 4-pointed diamond star (✦)
+            path = QPainterPath()
+            path.moveTo(cx, 1)
+            path.quadTo(cx, cy, w - 1, cy)
+            path.quadTo(cx, cy, cx, h - 1)
+            path.quadTo(cx, cy, 1, cy)
+            path.quadTo(cx, cy, cx, 1)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(self.color)
+            painter.drawPath(path)
+
+        elif self.motif == "cross":
+            # Architectural crosshair (+)
+            painter.setPen(QPen(self.color, 1.8, Qt.SolidLine, Qt.SquareCap))
+            painter.drawLine(QPointF(cx, 2), QPointF(cx, h - 2))
+            painter.drawLine(QPointF(2, cy), QPointF(w - 2, cy))
+
+        elif self.motif == "dot_grid":
+            # 2x2 dot matrix (::)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(self.color)
+            radius = 1.6
+            d = 3.5
+            for dx in (-d, d):
+                for dy in (-d, d):
+                    painter.drawEllipse(QPointF(cx + dx, cy + dy), radius, radius)
+
+        painter.end()
+

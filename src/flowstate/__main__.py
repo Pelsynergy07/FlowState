@@ -208,8 +208,13 @@ def main() -> int:
     controller.start(warmup=not is_first_run)
 
     if is_first_run:
+        from .ui.tutorial import TutorialDialog
         onboarding = OnboardingDialog(controller)
         onboarding.exec()
+        tutorial = TutorialDialog(controller)
+        tutorial.exec()
+        logger.info("Scheduling initial open_settings() after tutorial completion")
+        QTimer.singleShot(200, open_settings)
     elif "--autostart" not in sys.argv:
         # If user opened the app explicitly (not silent boot startup), show settings!
         logger.info("Scheduling initial open_settings()")

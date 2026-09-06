@@ -33,23 +33,40 @@ def download_dir_with_progress(
     do_download,
     on_progress=None,
 ) -> None:
-    """Runs do_download() (a blocking, no-arg callable that downloads into
-    target_dir) while polling target_dir's total size against
-    expected_bytes to estimate percent complete, emitting to on_progress
-    every 0.5s. Blocking -- call from a background thread, not the UI
-    thread. Works regardless of exactly which filenames/temp-file scheme
-    the download uses internally, since it sums everything under
-    target_dir rather than watching one specific path."""
+    """Runs do_download() while polling target_dir's total size against
+    expected_bytes to estimate percent complete, transfer speed, and ETA."""
+    import time
     target_dir.mkdir(parents=True, exist_ok=True)
     stop_event = threading.Event()
 
     def poll() -> None:
+        last_bytes = _dir_size(target_dir)
+        last_time = time.monotonic()
+        smoothed_speed = 0.0
+
         while not stop_event.is_set():
+            time.sleep(0.4)
             current = _dir_size(target_dir)
+            now = time.monotonic()
+            dt = max(now - last_time, 0.001)
+            instant_speed = max(current - last_bytes, 0) / dt
+            if smoothed_speed == 0.0:
+                smoothed_speed = instant_speed
+            else:
+                smoothed_speed = 0.7 * smoothed_speed + 0.3 * instant_speed
+
+            last_bytes = current
+            last_time = now
+
             pct = min(99, int(current / expected_bytes * 100)) if expected_bytes > 0 else 0
+            remaining_bytes = max(expected_bytes - current, 0)
+            eta_sec = int(remaining_bytes / smoothed_speed) if smoothed_speed > 1024 else None
+
             if on_progress:
-                on_progress(pct)
-            stop_event.wait(0.5)
+                try:
+                    on_progress(pct, current, expected_bytes, smoothed_speed, eta_sec)
+                except TypeError:
+                    on_progress(pct)
 
     poll_thread = threading.Thread(target=poll, daemon=True)
     poll_thread.start()
@@ -59,7 +76,10 @@ def download_dir_with_progress(
         stop_event.set()
         poll_thread.join(timeout=1)
     if on_progress:
-        on_progress(100)
+        try:
+            on_progress(100, expected_bytes, expected_bytes, 0.0, 0)
+        except TypeError:
+            on_progress(100)
 
 
 class ModelDownloadWorker(QObject):
