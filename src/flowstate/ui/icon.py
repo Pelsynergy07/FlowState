@@ -6,7 +6,7 @@ so the tray icon itself communicates status at a glance."""
 from __future__ import annotations
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 
 from .theme import ACCENT, DANGER, PAPER_RAISED
 
