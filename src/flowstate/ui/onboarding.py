@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QFrame,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -38,6 +40,7 @@ from .theme import (
     PAPER_RAISED,
     build_stylesheet,
     paint_paper_background,
+    setup_brutalist_combobox,
 )
 from .widgets import ActivitySpinner, GeometricMotif, StickerBadge
 
@@ -90,6 +93,24 @@ class _PreloadWorker(QObject):
         import time
 
         try:
+            if getattr(self._controller, "_is_preview", False):
+                import time
+
+                steps = [
+                    (15, "Step 1 of 2: Preparing Whisper Turbo speech engine...", "Verifying voice recognition models..."),
+                    (45, "Step 1 of 2: Initializing speech engine...", f"Loading voice models on {self._hw_name}..."),
+                    (75, "Step 2 of 2: Preparing text formatting model...", "Loading smart thought formatter..."),
+                    (100, "✓ System setup complete!", "Voice recognition and thought formatting ready."),
+                ]
+                for p, s, t in steps:
+                    time.sleep(0.4)
+                    self.progress.emit(p)
+                    self.status.emit(s)
+                    self.telemetry.emit(t)
+                time.sleep(0.3)
+                self.finished.emit()
+                return
+
             # 1. Download Whisper Turbo speech model
             self._download_asr()
 
@@ -216,8 +237,9 @@ class OnboardingDialog(QDialog):
         self._controller = controller
         self.setWindowTitle("FlowState Setup")
         self.setStyleSheet(build_stylesheet())
-        self.resize(680, 640)
-        self.setMinimumSize(540, 480)
+        self.resize(580, 680)
+        self.setMinimumSize(540, 640)
+        self.setMaximumWidth(600)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         cfg = controller.config_store.config
@@ -225,22 +247,8 @@ class OnboardingDialog(QDialog):
         self.skipped = False
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-
-        # Scroll area for responsive scaling on any display resolution or DPI setting
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
-        container = QWidget()
-        container.setObjectName("container")
-        container.setStyleSheet("background: transparent;")
-        c_layout = QVBoxLayout(container)
-        c_layout.setContentsMargins(32, 26, 32, 14)
-        c_layout.setSpacing(13)
+        outer.setContentsMargins(24, 20, 24, 18)
+        outer.setSpacing(11)
 
         # 1. Header with sticker badges and subtle geometric star motif
         header_row = QHBoxLayout()
@@ -261,11 +269,11 @@ class OnboardingDialog(QDialog):
         header_left.addLayout(eyebrow_row)
         header_left.addWidget(headline)
         header_row.addLayout(header_left, 1)
-        c_layout.addLayout(header_row)
+        outer.addLayout(header_row)
 
         rule = QFrame()
         rule.setProperty("role", "rule")
-        c_layout.addWidget(rule)
+        outer.addWidget(rule)
 
         # 2. Hardware detection readout card with subtle architectural crosshair
         hw_card = QFrame()
@@ -278,6 +286,7 @@ class OnboardingDialog(QDialog):
         hw_texts.setSpacing(2)
         hw_lbl = QLabel(f"HARDWARE DETECTED: {self.hw_name.upper()}")
         hw_lbl.setFont(make_font(FONT_FAMILY_MONO, 9, bold=True))
+        hw_lbl.setWordWrap(True)
 
         if self.is_gpu:
             hw_desc = f"{self.hw_detail} • CUDA accelerated for instant real-time dictation."
@@ -292,32 +301,32 @@ class OnboardingDialog(QDialog):
         hw_texts.addWidget(hw_sub)
         hw_layout.addWidget(hw_icon)
         hw_layout.addLayout(hw_texts, 1)
-        c_layout.addWidget(hw_card)
+        outer.addWidget(hw_card)
 
         # 2b. Microphone input selector card
         mic_card = QFrame()
         mic_card.setProperty("role", "card")
-        mic_layout = QHBoxLayout(mic_card)
+        mic_layout = QVBoxLayout(mic_card)
         mic_layout.setContentsMargins(16, 10, 16, 10)
-        mic_layout.setSpacing(12)
+        mic_layout.setSpacing(6)
 
+        mic_head = QHBoxLayout()
+        mic_head.setSpacing(8)
         mic_icon = QLabel("🎙️")
-        mic_icon.setFont(make_font(FONT_FAMILY, 15))
-        mic_layout.addWidget(mic_icon)
-
-        mic_texts = QVBoxLayout()
-        mic_texts.setSpacing(2)
-        mic_lbl = QLabel("AUDIO INPUT (MICROPHONE):")
+        mic_icon.setFont(make_font(FONT_FAMILY, 14))
+        mic_lbl = QLabel("AUDIO INPUT (MICROPHONE)")
         mic_lbl.setFont(make_font(FONT_FAMILY_MONO, 8.5, bold=True))
-        mic_sub = QLabel("Select your microphone:")
-        mic_sub.setFont(make_font(FONT_FAMILY, 8.5))
-        mic_sub.setStyleSheet("color: #5C5751;")
-        mic_texts.addWidget(mic_lbl)
-        mic_texts.addWidget(mic_sub)
-        mic_layout.addLayout(mic_texts)
+        mic_head.addWidget(mic_icon)
+        mic_head.addWidget(mic_lbl)
+        mic_head.addStretch(1)
+        mic_layout.addLayout(mic_head)
 
         self.mic_combo = QComboBox()
-        self.mic_combo.setFixedHeight(38)
+        self.mic_combo.setFixedHeight(34)
+        self.mic_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.mic_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.mic_combo.setMinimumContentsLength(10)
+        setup_brutalist_combobox(self.mic_combo)
         self.mic_combo.addItem("System Default", None)
         try:
             from ..audio.devices import list_input_devices
@@ -331,19 +340,22 @@ class OnboardingDialog(QDialog):
         idx = self.mic_combo.findData(current_mic)
         self.mic_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self.mic_combo.currentIndexChanged.connect(self._on_mic_changed)
-        mic_layout.addWidget(self.mic_combo, 1)
+        mic_layout.addWidget(self.mic_combo)
 
-        c_layout.addWidget(mic_card)
+        outer.addWidget(mic_card)
 
         # 3. Core features with fun, energetic neo-brutalist copy
         features_card = QFrame()
         features_card.setProperty("role", "card")
+        features_card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         f_layout = QVBoxLayout(features_card)
-        f_layout.setContentsMargins(18, 14, 18, 14)
-        f_layout.setSpacing(8)
+        f_layout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
+        f_layout.setContentsMargins(18, 12, 18, 12)
+        f_layout.setSpacing(6)
 
         def _make_bullet(index_str: str, bold_prefix: str, desc: str) -> QHBoxLayout:
             row = QHBoxLayout()
+            row.setSizeConstraint(QHBoxLayout.SetMinimumSize)
             row.setSpacing(12)
             idx = QLabel(index_str)
             idx.setFont(make_font(FONT_FAMILY_MONO, 8.5, bold=True))
@@ -351,10 +363,11 @@ class OnboardingDialog(QDialog):
                 "color: #1A1A1A; background-color: #EFE8DC; border: 1.5px solid #1A1A1A; border-radius: 3px; padding: 2px 4px;"
             )
             idx.setFixedWidth(52)
+            idx.setFixedHeight(22)
             idx.setAlignment(Qt.AlignCenter)
             txt = QLabel(f"<b>{bold_prefix}</b> {desc}")
             txt.setFont(make_font(FONT_FAMILY, 9.5))
-            txt.setWordWrap(True)
+            txt.setFixedHeight(20)
             row.addWidget(idx)
             row.addWidget(txt, 1)
             return row
@@ -367,12 +380,14 @@ class OnboardingDialog(QDialog):
         )
         f_layout.addLayout(_make_bullet("[ 03 ]", "Highlight (Ctrl+Drag):", "Select any area on your screen."))
         f_layout.addLayout(_make_bullet("[ 04 ]", "AI Polish:", "Auto-cleans grammar and structure."))
-        c_layout.addWidget(features_card)
+        outer.addWidget(features_card)
 
         # 4. Status & Telemetry section
         status_card = QFrame()
         status_card.setProperty("role", "card")
+        status_card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         s_layout = QVBoxLayout(status_card)
+        s_layout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
         s_layout.setContentsMargins(18, 12, 18, 12)
         s_layout.setSpacing(7)
 
@@ -397,32 +412,30 @@ class OnboardingDialog(QDialog):
         self.telemetry_label = QLabel("")
         self.telemetry_label.setFont(make_font(FONT_FAMILY_MONO, 8.5))
         self.telemetry_label.setStyleSheet("color: #5C5751;")
+        self.telemetry_label.setWordWrap(True)
         self.telemetry_label.hide()
         s_layout.addWidget(self.telemetry_label)
 
-        c_layout.addWidget(status_card)
-        c_layout.addStretch(1)
-
-        scroll.setWidget(container)
-        outer.addWidget(scroll, 1)
+        outer.addWidget(status_card)
+        outer.addStretch(1)
 
         # 5. Action Buttons with Skip Option pinned at bottom
         btn_bar = QWidget()
         btn_bar.setStyleSheet("background: transparent;")
         btn_row = QHBoxLayout(btn_bar)
-        btn_row.setContentsMargins(32, 8, 32, 18)
+        btn_row.setContentsMargins(0, 4, 0, 0)
         btn_row.setSpacing(10)
 
         self.skip_btn = QPushButton("Skip for Now")
         self.skip_btn.setProperty("role", "secondary")
-        self.skip_btn.setMinimumWidth(130)
-        self.skip_btn.setFixedHeight(46)
+        self.skip_btn.setMinimumWidth(115)
+        self.skip_btn.setFixedHeight(44)
         self.skip_btn.setCursor(Qt.PointingHandCursor)
         self.skip_btn.clicked.connect(self._skip_onboarding)
         btn_row.addWidget(self.skip_btn)
 
         self.start_btn = QPushButton("Get Started →")
-        self.start_btn.setFixedHeight(46)
+        self.start_btn.setFixedHeight(44)
         self.start_btn.setProperty("role", "primary")
         self.start_btn.setStyleSheet(
             "background-color: #1A1A1A; color: #FFFFFF; border: 2px solid #1A1A1A; "
@@ -442,6 +455,15 @@ class OnboardingDialog(QDialog):
         painter = QPainter(self)
         paint_paper_background(painter, self.rect())
 
+    def _sync_window_size(self) -> None:
+        """Automatically expand dialog height if dynamic contents need more space."""
+        self.updateGeometry()
+        QApplication.processEvents()
+        hint = self.sizeHint()
+        needed_h = max(self.height(), hint.height())
+        if needed_h > self.height():
+            self.resize(self.width(), needed_h + 8)
+
     def _on_mic_changed(self) -> None:
         new_mic = self.mic_combo.currentData()
         self._controller.config_store.config.general.microphone_device = new_mic
@@ -457,6 +479,14 @@ class OnboardingDialog(QDialog):
         logger.info("User skipped onboarding.")
         self.accept()
 
+    def _on_telemetry_update(self, text: str) -> None:
+        self.telemetry_label.setText(text)
+        self._sync_window_size()
+
+    def _on_status_update(self, text: str) -> None:
+        self.status_label.setText(text)
+        self._sync_window_size()
+
     def _start_setup(self) -> None:
         self.start_btn.setEnabled(False)
         self.start_btn.setText("Setting Things Up...")
@@ -466,13 +496,14 @@ class OnboardingDialog(QDialog):
         self.progress.show()
         self.telemetry_label.setText("Preparing model download...")
         self.telemetry_label.show()
+        self._sync_window_size()
 
         self._thread = QThread()
         self._worker = _PreloadWorker(self._controller, self.hw_name, self.is_gpu, self.cores)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
-        self._worker.status.connect(self.status_label.setText)
-        self._worker.telemetry.connect(self.telemetry_label.setText)
+        self._worker.status.connect(self._on_status_update)
+        self._worker.telemetry.connect(self._on_telemetry_update)
         self._worker.progress.connect(self.progress.setValue)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -485,6 +516,7 @@ class OnboardingDialog(QDialog):
         self.status_label.setText("FlowState is ready for instant dictation!")
         self.telemetry_label.setText("Everything is installed and ready to go.")
         self.progress.setValue(100)
+        self._sync_window_size()
         self.start_btn.setText("Open FlowState && Start Tutorial →")
         self.start_btn.setEnabled(True)
         self.skip_btn.setEnabled(True)
@@ -495,6 +527,7 @@ class OnboardingDialog(QDialog):
         self.spinner.hide()
         self.status_label.setText("Preload encountered a network notice, but FlowState can still launch.")
         self.telemetry_label.setText(f"Details: {message}")
+        self._sync_window_size()
         self.start_btn.setText("Open FlowState Anyway →")
         self.start_btn.setEnabled(True)
         self.skip_btn.setEnabled(True)

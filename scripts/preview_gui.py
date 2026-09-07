@@ -57,6 +57,7 @@ def main() -> None:
             self.hw_name = "NVIDIA GeForce RTX 2070"
             self.is_gpu = True
             self.cores = 8
+            self._is_preview = True
             from PySide6.QtCore import QObject, Signal
             class DummySignals(QObject):
                 recording_started = Signal()

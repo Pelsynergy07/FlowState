@@ -145,29 +145,60 @@ def build_stylesheet() -> str:
         top: -2px;
     }}
 
+    /* 3D Tactile File Folder Tabs */
     QTabBar::tab {{
-        background: {PAPER_RAISED};
-        color: {INK};
+        background: #EFECE6;
+        color: #4A4A4A;
         font-family: "{FONT_FAMILY_STICKER}";
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.5px;
-        padding: 9px 12px;
+        padding: 7px 11px 6px 11px;
         border: 2px solid {BORDER};
+        border-right: 3.5px solid {BORDER};
         border-bottom: 2px solid {BORDER};
-        border-top-left-radius: 4px;
-        border-top-right-radius: 4px;
-        margin-right: 4px;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        margin-top: 5px;
+        margin-right: 3px;
     }}
 
     QTabBar::tab:hover:!selected {{
-        background: {PAPER_ALT};
+        background: #FAF7F2;
+        color: {INK};
+        margin-top: 3px;
+        padding: 9px 11px 6px 11px;
+        border-right: 4px solid {BORDER};
+    }}
+
+    QTabBar::tab:pressed {{
+        background: #E3DDD2;
+        margin-top: 6px;
+        margin-left: 2px;
+        border-right: 2px solid {BORDER};
+        border-bottom: 2px solid {BORDER};
     }}
 
     QTabBar::tab:selected {{
         background: {INK};
         color: #FFFFFF;
-        border-bottom: 2px solid {INK};
+        font-weight: 900;
+        padding: 9px 13px 7px 13px;
+        border: 2.5px solid {BORDER};
+        border-right: 4px solid {BORDER};
+        border-bottom: 2.5px solid {BORDER};
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        margin-top: 0px;
+        margin-left: 0px;
+        margin-right: 3px;
+    }}
+
+    QTabBar::tab:selected:pressed {{
+        margin-top: 2px;
+        margin-left: 1px;
+        border-right: 2.5px solid {BORDER};
+        border-bottom: 2.5px solid {BORDER};
     }}
 
     /* Faux 3D Neo-Brutalist Buttons */
@@ -281,11 +312,17 @@ def build_stylesheet() -> str:
         font-size: 12.5px;
         font-weight: 600;
         color: {INK};
-        min-height: 26px;
+        min-height: 28px;
     }}
 
     QComboBox:hover {{
         background-color: #FAF6EF;
+        border-right: 4px solid {BORDER};
+        border-bottom: 4px solid {BORDER};
+    }}
+
+    QComboBox:on {{
+        background-color: #FFFFFF;
     }}
 
     QComboBox::drop-down {{
@@ -293,7 +330,7 @@ def build_stylesheet() -> str:
         subcontrol-position: top right;
         width: 28px;
         background-color: {INK};
-        border-left: 2.5px solid {BORDER};
+        border-left: 2px solid {BORDER};
         border-top-right-radius: 4px;
         border-bottom-right-radius: 4px;
     }}
@@ -304,29 +341,37 @@ def build_stylesheet() -> str:
         height: 6px;
     }}
 
-    QComboBox QAbstractItemView {{
-        background-color: {PAPER_RAISED};
-        border: 2.5px solid {BORDER};
-        border-right: 4px solid {BORDER};
-        border-bottom: 4px solid {BORDER};
-        color: {INK};
-        selection-background-color: {INK};
-        selection-color: #FFFFFF;
+    /* Absolute light-mode styling for dropdown popup on all OS themes */
+    QComboBox QAbstractItemView,
+    QComboBox QListView {{
+        background-color: #FFFFFF !important;
+        border: 2px solid #000000 !important;
+        border-right: 3.5px solid #000000 !important;
+        border-bottom: 3.5px solid #000000 !important;
+        border-radius: 0px !important;
+        color: #121212 !important;
+        selection-background-color: #000000 !important;
+        selection-color: #FFFFFF !important;
         outline: none;
-        padding: 4px;
-        font-size: 13px;
+        padding: 4px 2px;
+        font-size: 12.5px;
     }}
 
-    QComboBox QAbstractItemView::item {{
+    QComboBox QAbstractItemView::item,
+    QComboBox QListView::item {{
         min-height: 32px;
-        padding: 6px 10px;
-        color: {INK};
+        padding: 6px 12px;
+        color: #121212 !important;
+        background-color: #FFFFFF !important;
         border: none;
     }}
 
-    QComboBox QAbstractItemView::item:selected {{
-        background-color: {INK};
-        color: {PAPER_RAISED};
+    QComboBox QAbstractItemView::item:hover,
+    QComboBox QAbstractItemView::item:selected,
+    QComboBox QListView::item:hover,
+    QComboBox QListView::item:selected {{
+        background-color: #000000 !important;
+        color: #FFFFFF !important;
     }}
 
     QCheckBox {{
@@ -447,3 +492,17 @@ def build_stylesheet() -> str:
         background-color: {ACCENT};
     }}
     """
+
+
+def setup_brutalist_combobox(combo) -> None:
+    """Configures a QComboBox with a dedicated QListView so Windows Dark Mode never blackouts the popup."""
+    from PySide6.QtWidgets import QListView
+    view = QListView(combo)
+    view.setStyleSheet(
+        "QListView { background-color: #FFFFFF !important; color: #121212 !important; "
+        "border: 2px solid #000000; border-right: 3.5px solid #000000; border-bottom: 3.5px solid #000000; outline: none; } "
+        "QListView::item { min-height: 32px; padding: 6px 12px; color: #121212 !important; background-color: #FFFFFF !important; } "
+        "QListView::item:hover, QListView::item:selected { background-color: #000000 !important; color: #FFFFFF !important; }"
+    )
+    combo.setView(view)
+

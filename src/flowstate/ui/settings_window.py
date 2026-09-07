@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -39,8 +40,9 @@ from ..session.store import list_sessions, purge_all_sessions
 from ..ui.update_notifier import UpdateNotifierSignals, check_for_update_async
 from ..update_check import UpdateInfo
 from .autostart import set_launch_at_login
+from .fonts import make_font
 from .key_recorder import KeyRecorderWidget
-from .theme import FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background
+from .theme import FONT_FAMILY, FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background, setup_brutalist_combobox
 from .widgets import BrutalistCheckBox, StickerBadge
 
 
@@ -74,9 +76,8 @@ def _card(*widgets: QWidget) -> QFrame:
     frame = QFrame()
     frame.setProperty("role", "card")
     layout = QVBoxLayout(frame)
-    layout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
-    layout.setContentsMargins(22, 20, 22, 20)
-    layout.setSpacing(12)
+    layout.setContentsMargins(20, 14, 20, 14)
+    layout.setSpacing(8)
     for w in widgets:
         layout.addWidget(w)
     return frame
@@ -103,8 +104,8 @@ class SettingsWindow(QDialog):
         self._update_info = update_info
         self.setWindowTitle("FlowState Settings")
         self.setStyleSheet(build_stylesheet())
-        self.resize(760, 640)
-        self.setMinimumSize(700, 580)
+        self.resize(780, 680)
+        self.setMinimumSize(740, 600)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(30, 26, 30, 22)
@@ -167,12 +168,6 @@ class SettingsWindow(QDialog):
 
         button_row = QHBoxLayout()
         button_row.addStretch(1)
-        restart_btn = QPushButton("↺ Restart App")
-        restart_btn.setProperty("role", "secondary")
-        restart_btn.setToolTip("Relaunch FlowState cleanly to reset all audio and GPU drivers")
-        restart_btn.clicked.connect(self._restart_app)
-        button_row.addWidget(restart_btn)
-        button_row.addStretch(1)
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setProperty("role", "secondary")
         cancel_btn.clicked.connect(self.reject)
@@ -233,12 +228,15 @@ class SettingsWindow(QDialog):
     # -- General --------------------------------------------------------
     def _build_general_tab(self) -> QWidget:
         cfg = self.config_store.config.general
+        self._initial_mic = cfg.microphone_device
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(26, 24, 26, 24)
         layout.setSpacing(18)
 
         self.mic_combo = QComboBox()
+        self.mic_combo.setFixedHeight(36)
+        setup_brutalist_combobox(self.mic_combo)
         self.mic_combo.addItem("System default", None)
         for d in list_input_devices():
             self.mic_combo.addItem(d.name, d.name)
@@ -255,11 +253,12 @@ class SettingsWindow(QDialog):
         self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
         mic_meta_row.addWidget(self.mic_status_lbl, 1)
 
-        restart_mic_btn = QPushButton("↺ RESTART TO RESET AUDIO")
-        restart_mic_btn.setProperty("role", "secondary")
-        restart_mic_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; padding: 4px 10px;")
-        restart_mic_btn.clicked.connect(self._restart_app)
-        mic_meta_row.addWidget(restart_mic_btn)
+        self._mic_restart_btn = QPushButton("↺ RESTART TO RESET AUDIO")
+        self._mic_restart_btn.setProperty("role", "secondary")
+        self._mic_restart_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; padding: 4px 10px;")
+        self._mic_restart_btn.clicked.connect(self._restart_app)
+        self._mic_restart_btn.hide()
+        mic_meta_row.addWidget(self._mic_restart_btn)
 
         layout.addWidget(_card(_eyebrow("01 / Microphone"), self.mic_combo, mic_meta_widget))
 
@@ -278,8 +277,14 @@ class SettingsWindow(QDialog):
             self._controller.switch_microphone(new_mic)
         elif self._on_applied:
             self._on_applied()
-        self.mic_status_lbl.setText("✓ Audio stream switched live (ready)")
-        self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
+        if new_mic != self._initial_mic:
+            self._mic_restart_btn.show()
+            self.mic_status_lbl.setText("● Audio source changed. Restart to reset device stream.")
+            self.mic_status_lbl.setStyleSheet("color: #b05a00; font-weight: 700; font-size: 11px;")
+        else:
+            self._mic_restart_btn.hide()
+            self.mic_status_lbl.setText("✓ Live audio stream connected")
+            self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
 
 
     # -- Shortcuts --------------------------------------------------------
@@ -287,12 +292,20 @@ class SettingsWindow(QDialog):
         cfg = self.config_store.config.shortcuts
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
-        layout.setSpacing(18)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(12)
 
-        layout.addWidget(
-            _muted("Click any box or press RECORD, then physically tap the key or combination on your keyboard.")
+        header_row = QHBoxLayout()
+        header_row.addWidget(
+            _muted("Click any box or press RECORD, then tap your keyboard shortcut.")
         )
+        header_row.addStretch(1)
+        reset_btn = QPushButton("↺ Reset to Defaults")
+        reset_btn.setProperty("role", "secondary")
+        reset_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; padding: 4px 10px;")
+        reset_btn.clicked.connect(self._reset_shortcuts)
+        header_row.addWidget(reset_btn)
+        layout.addLayout(header_row)
 
         self.toggle_edit = KeyRecorderWidget(cfg.toggle)
         layout.addWidget(
@@ -312,14 +325,6 @@ class SettingsWindow(QDialog):
             )
         )
 
-        btn_row = QHBoxLayout()
-        reset_btn = QPushButton("Reset to Defaults")
-        reset_btn.setProperty("role", "secondary")
-        reset_btn.clicked.connect(self._reset_shortcuts)
-        btn_row.addWidget(reset_btn)
-        btn_row.addStretch(1)
-        layout.addLayout(btn_row)
-
         layout.addStretch(1)
         return page
 
@@ -338,6 +343,8 @@ class SettingsWindow(QDialog):
         layout.setSpacing(18)
 
         self.device_combo = QComboBox()
+        self.device_combo.setFixedHeight(36)
+        setup_brutalist_combobox(self.device_combo)
         self.device_combo.addItems(["auto", "cuda", "cpu"])
         self.device_combo.setCurrentText(cfg.compute_device)
         layout.addWidget(
@@ -401,6 +408,8 @@ class SettingsWindow(QDialog):
         layout.setSpacing(18)
 
         self.capture_mode = QComboBox()
+        self.capture_mode.setFixedHeight(36)
+        setup_brutalist_combobox(self.capture_mode)
         self.capture_mode.addItem("Hold Ctrl and drag", "drag")
         self.capture_mode.addItem("Click to draw circle", "circle")
         self.capture_mode.addItem("Off", "off")
@@ -677,32 +686,62 @@ class SettingsWindow(QDialog):
     # -- About --------------------------------------------------------
     def _build_about_tab(self) -> QWidget:
         page = QWidget()
+        page.setStyleSheet("background: transparent;")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(24, 14, 24, 14)
+        layout.setSpacing(12)
 
-        # 1. Developer Profile Card
+        # 1. System Capabilities & Overview Card (Clean 2x2 grid without bulky subtext)
+        about_card = QFrame()
+        about_card.setProperty("role", "card")
+        about_layout = QVBoxLayout(about_card)
+        about_layout.setContentsMargins(18, 12, 18, 12)
+        about_layout.setSpacing(8)
+
+        about_layout.addWidget(_eyebrow("09 / SYSTEM OVERVIEW & CORE CAPABILITIES"))
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(8)
+
+        def _make_about_chip(icon: str, title: str) -> QWidget:
+            chip = QWidget()
+            row = QHBoxLayout(chip)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(8)
+            icon_badge = QLabel(icon)
+            icon_badge.setFixedSize(24, 24)
+            icon_badge.setAlignment(Qt.AlignCenter)
+            icon_badge.setStyleSheet(
+                "background-color: #FAF6EF; border: 1.5px solid #000000; "
+                "border-right: 2.5px solid #000000; border-bottom: 2.5px solid #000000; "
+                "border-radius: 3px; font-size: 12px;"
+            )
+            t_lbl = QLabel(title)
+            t_lbl.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; color: #000000;")
+            row.addWidget(icon_badge)
+            row.addWidget(t_lbl, 1)
+            return chip
+
+        grid.addWidget(_make_about_chip("⚡", "REAL-TIME OFFLINE SPEECH ENGINE"), 0, 0)
+        grid.addWidget(_make_about_chip("🧠", "LOCAL AI THOUGHT STRUCTURING"), 0, 1)
+        grid.addWidget(_make_about_chip("🎯", "VISUAL CONTEXT GROUNDING"), 1, 0)
+        grid.addWidget(_make_about_chip("🔒", "100% PRIVATE & ZERO TELEMETRY"), 1, 1)
+        about_layout.addLayout(grid)
+        layout.addWidget(about_card)
+
+        # 2. Developer Profile Card
         dev_card = QFrame()
         dev_card.setProperty("role", "card")
         dev_card_layout = QVBoxLayout(dev_card)
-        dev_card_layout.setContentsMargins(22, 18, 22, 18)
-        dev_card_layout.setSpacing(10)
+        dev_card_layout.setContentsMargins(18, 12, 18, 12)
+        dev_card_layout.setSpacing(8)
 
-        # Info column
-        info_col = QVBoxLayout()
-        info_col.setSpacing(6)
-        info_col.addWidget(_eyebrow("CREATOR & ARCHITECT"))
+        dev_card_layout.addWidget(_eyebrow("10 / CREATOR & COMMUNITY"))
 
         author_name = QLabel("Developed with ❤️ by Pelsynergy")
-        author_name.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 15px; font-weight: 900; color: #000000;")
-        info_col.addWidget(author_name)
-
-        bio_lbl = QLabel(
-            "Crafting high-speed, local-first tactile AI systems with zero telemetries and zero latency."
-        )
-        bio_lbl.setProperty("role", "muted")
-        bio_lbl.setWordWrap(True)
-        info_col.addWidget(bio_lbl)
+        author_name.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 14px; font-weight: 900; color: #000000;")
+        dev_card_layout.addWidget(author_name)
 
         # Social & portfolio link buttons
         links_row = QHBoxLayout()
@@ -712,7 +751,7 @@ class SettingsWindow(QDialog):
             btn = QPushButton(text)
             btn.setProperty("role", "secondary")
             btn.setStyleSheet(
-                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 900; padding: 5px 10px;"
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 900; padding: 5px 12px;"
             )
             btn.clicked.connect(lambda: webbrowser.open(url))
             return btn
@@ -721,19 +760,18 @@ class SettingsWindow(QDialog):
         links_row.addWidget(_make_link_btn("💼 LINKEDIN", "https://www.linkedin.com/in/pranav-kumar-95708723b/"))
         links_row.addWidget(_make_link_btn("🐙 GITHUB", "https://github.com/Pelsynergy07/FlowState"))
         links_row.addStretch(1)
-        info_col.addLayout(links_row)
+        dev_card_layout.addLayout(links_row)
 
-        dev_card_layout.addLayout(info_col, 1)
         layout.addWidget(dev_card)
 
-        # 2. Release & Updates Card
+        # 3. Release & Updates Card
         update_card = QFrame()
         update_card.setProperty("role", "card")
         update_card_layout = QVBoxLayout(update_card)
-        update_card_layout.setContentsMargins(20, 18, 20, 18)
-        update_card_layout.setSpacing(10)
+        update_card_layout.setContentsMargins(18, 12, 18, 12)
+        update_card_layout.setSpacing(8)
 
-        update_card_layout.addWidget(_eyebrow("09 / SYSTEM VERSION & LIVE UPDATES"))
+        update_card_layout.addWidget(_eyebrow("11 / SYSTEM VERSION & LIVE UPDATES"))
 
         ver_row = QHBoxLayout()
         ver_lbl = QLabel(f"FlowState v{__version__} // Windows Native x64")
@@ -743,7 +781,7 @@ class SettingsWindow(QDialog):
         self._check_update_btn = QPushButton("CHECK FOR UPDATES")
         self._check_update_btn.setProperty("role", "secondary")
         self._check_update_btn.setStyleSheet(
-            f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 6px 14px;"
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 5px 12px;"
         )
         self._check_update_btn.clicked.connect(self._manual_check_updates)
         ver_row.addWidget(self._check_update_btn)
