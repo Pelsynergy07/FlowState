@@ -67,11 +67,14 @@ def _set_clipboard_image(image_path: Path) -> None:
 
 
 def _restore_clipboard(previous_text: str | None) -> None:
+    if previous_text is None:
+        # If the clipboard originally had non-text data (image, files) or couldn't
+        # be read, do not wipe the clipboard.
+        return
     win32clipboard.OpenClipboard()
     try:
         win32clipboard.EmptyClipboard()
-        if previous_text:
-            win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, previous_text)
+        win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, previous_text)
     finally:
         win32clipboard.CloseClipboard()
 

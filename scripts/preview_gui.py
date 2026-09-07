@@ -63,6 +63,23 @@ def main() -> None:
                 recording_finished = Signal(str)
             self.signals = DummySignals()
 
+            from unittest.mock import MagicMock
+            self._asr = MagicMock()
+            self._asr.active_device = "cuda"
+            self._asr.active_model_id = "large-v3-turbo"
+            spec = MagicMock()
+            spec.id = "large-v3-turbo"
+            spec.display_name = "Whisper Large v3 Turbo"
+            spec.approx_size_mb = 1600
+            self._asr.resolve_target_model.return_value = spec
+            self._asr._load = lambda: None
+
+            self._pipeline = MagicMock()
+            self._pipeline.preload.return_value = True
+
+        def apply_config_change(self):
+            pass
+
     def open_onboarding() -> None:
         dlg = OnboardingDialog(DummyController())
         dlg.exec()

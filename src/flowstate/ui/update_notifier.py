@@ -18,10 +18,10 @@ class UpdateNotifierSignals(QObject):
     checked = Signal(object)  # UpdateInfo | None
 
 
-def check_for_update_async(signals: UpdateNotifierSignals) -> None:
+def check_for_update_async(signals: UpdateNotifierSignals, force: bool = False) -> None:
     def _run() -> None:
         try:
-            result = check_for_update()
+            result = check_for_update(force=force)
         except Exception:
             logger.warning("Update check failed unexpectedly", exc_info=True)
             result = None

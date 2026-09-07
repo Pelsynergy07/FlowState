@@ -108,25 +108,44 @@ class SmartFormatter:
     def available(self) -> bool:
         return self._llm is not None
 
-    def preload(self) -> bool:
-        """Attempt to load the model now. Called once, off the UI thread,
-        shortly after launch. Returns True on success."""
+    @property
+    def is_ready(self) -> bool:
+        return self._llm is not None
+
+    @staticmethod
+    def is_model_cached() -> bool:
+        model_file = paths.models_dir() / "formatter" / MODEL_FILE
+        return model_file.is_file() and model_file.stat().st_size > 100 * 1024 * 1024
+
+    def preload(self, allow_download: bool = True) -> bool:
+        """Attempt to load the model now. Called off the UI thread (warmup/onboarding).
+        Returns True on success."""
         if self._llm is not None:
             return True
         with self._load_lock:
             if self._llm is not None:
                 return True
-            return self._preload_locked()
+            return self._preload_locked(allow_download=allow_download)
 
-    def _preload_locked(self) -> bool:
+    def _preload_locked(self, allow_download: bool = True) -> bool:
         if self._load_failed:
             return False
+        model_dir = paths.models_dir() / "formatter"
+        model_file = model_dir / MODEL_FILE
+        is_cached = self.is_model_cached()
+
+        if not is_cached and not allow_download:
+            return False
+
         try:
             from huggingface_hub import hf_hub_download
             from llama_cpp import Llama
 
-            model_dir = paths.models_dir() / "formatter"
-            model_path = hf_hub_download(MODEL_REPO, MODEL_FILE, local_dir=str(model_dir))
+            if is_cached:
+                model_path = str(model_file)
+            else:
+                model_path = hf_hub_download(MODEL_REPO, MODEL_FILE, local_dir=str(model_dir))
+
             llm = Llama(
                 model_path=model_path,
                 n_gpu_layers=0,
@@ -158,8 +177,14 @@ class SmartFormatter:
     def correct(self, text: str) -> str:
         if not text or not text.strip():
             return text
-        if self._llm is None and not self.preload():
-            return text
+        if self._llm is None:
+            # During recording stop, NEVER trigger a multi-minute 1.15GB network download.
+            # If the model is not cached on disk, skip formatting gracefully and return raw text.
+            if not self.is_model_cached():
+                logger.info("Smart formatter model not downloaded yet; skipping LLM formatting.")
+                return text
+            if not self.preload(allow_download=False):
+                return text
         try:
             result = self._llm.create_chat_completion(
                 messages=_build_messages(text),

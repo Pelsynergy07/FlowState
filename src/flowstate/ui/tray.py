@@ -26,6 +26,8 @@ class TrayController:
         on_update_requested: Callable[[UpdateInfo], None] | None = None,
     ):
         self._on_toggle_recording = on_toggle_recording
+        self._on_open_settings = on_open_settings
+        self._on_quit = on_quit
         self._on_update_requested = on_update_requested
         self._update_info: UpdateInfo | None = None
 
@@ -73,7 +75,12 @@ class TrayController:
             return
         for folder in folders:
             transcript_path = folder / "transcript.txt"
-            preview = transcript_path.read_text(encoding="utf-8")[:40] if transcript_path.exists() else folder.name
+            preview = folder.name
+            if transcript_path.exists():
+                try:
+                    preview = transcript_path.read_text(encoding="utf-8", errors="replace")[:40]
+                except Exception:
+                    preview = folder.name
             action = self.recent_menu.addAction(preview or folder.name)
             action.triggered.connect(lambda checked=False, f=folder: os.startfile(str(f)))
 

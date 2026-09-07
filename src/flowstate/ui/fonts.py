@@ -43,12 +43,16 @@ def load_bundled_fonts() -> None:
             logger.warning("Could not load bundled font: %s", filename, exc_info=True)
 
 
-def make_font(family: str, size: int, bold: bool = False, italic: bool = False):
+def make_font(family: str, size: int | float, bold: bool = False, italic: bool = False):
     """Creates a QFont safely without triggering Shiboken parameter generic type errors on Python 3.12."""
     from PySide6.QtGui import QFont
+
     f = QFont()
     f.setFamily(family)
-    f.setPointSize(size)
+    if isinstance(size, float):
+        f.setPointSizeF(size)
+    else:
+        f.setPointSize(int(size))
     if bold:
         f.setBold(True)
     if italic:

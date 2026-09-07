@@ -76,6 +76,7 @@ class RecordingController:
 
         self._recording = False
         self._recording_mode: str | None = None  # None, "toggle", or "ptt"
+        self._processing = False
         self._current_session: Session | None = None
         self._current_hwnd: int | None = None
         self._captured_images: list[Path] = []
@@ -128,6 +129,9 @@ class RecordingController:
         self._hotkeys.set_bindings(cfg.shortcuts.toggle, cfg.shortcuts.push_to_talk)
         self._pipeline.vocabulary_enabled = cfg.cleanup.vocabulary_enabled
         self._pipeline.grammar_enabled = cfg.cleanup.grammar_enabled
+        new_device_index = self._resolve_device_index(cfg.general.microphone_device)
+        if not self._recording:
+            self._recorder = Recorder(device_index=new_device_index)
 
     def get_input_level(self) -> float:
         """Current mic input level (0..1), for a HUD level meter."""
@@ -136,6 +140,10 @@ class RecordingController:
     @property
     def is_recording(self) -> bool:
         return self._recording
+
+    @property
+    def is_processing(self) -> bool:
+        return self._processing
 
     def toggle_recording(self) -> None:
         if self._recording_mode == "toggle":
@@ -147,7 +155,7 @@ class RecordingController:
             self.start_recording(mode="toggle")
 
     def start_recording(self, mode: str = "ptt") -> None:
-        if self._recording:
+        if self._recording or self._processing:
             return
         self._recording = True
         self._recording_mode = mode
@@ -213,17 +221,24 @@ class RecordingController:
         except Exception:
             logger.warning("Failed to capture/annotate screenshot from drag", exc_info=True)
 
-    def _build_capture_references(self, segments: list[tuple[float, float, str]]) -> str:
+    def _build_capture_references(
+        self,
+        segments: list[tuple[float, float, str]],
+        captured_images: list[Path] | None = None,
+        capture_offsets: list[float] | None = None,
+    ) -> str:
         """A short, plain-text block naming each screenshot taken during
         this recording, when it was taken, and what was being said nearby
         -- appended after cleanup so an agent reading the pasted transcript
         (e.g. "look at this") can tell which capture_N.png a reference
         like that points to, instead of just seeing a bare image on the
         clipboard with no textual link back to it."""
-        if not self._captured_images:
+        images = captured_images if captured_images is not None else self._captured_images
+        offsets = capture_offsets if capture_offsets is not None else self._capture_offsets
+        if not images:
             return ""
         lines = ["", "[Screenshots captured during this recording:]"]
-        for i, (image_path, offset) in enumerate(zip(self._captured_images, self._capture_offsets), start=1):
+        for i, (image_path, offset) in enumerate(zip(images, offsets), start=1):
             mins, secs = divmod(int(offset), 60)
             nearby = self._nearest_segment_text(segments, offset)
             entry = f'{i}. {image_path.name} at {mins}:{secs:02d}'
@@ -250,6 +265,7 @@ class RecordingController:
             return
         self._recording = False
         self._recording_mode = None
+        self._processing = True
 
         if self._capture_hook is not None:
             self._capture_hook.stop()
@@ -259,29 +275,54 @@ class RecordingController:
         if cfg.general.sound_cues:
             cues.play_stop_cue()
 
-        wav_path = self._current_session.folder / "audio.wav"
+        session = self._current_session
+        current_hwnd = self._current_hwnd
+        captured_images = list(self._captured_images)
+        capture_offsets = list(self._capture_offsets)
+
+        self._current_session = None
+        self._current_hwnd = None
+        self._captured_images = []
+        self._capture_offsets = []
+
+        wav_path = session.folder / "audio.wav"
         self._recorder.stop_and_save(wav_path)
         self.signals.processing_started.emit()
 
+        # Run transcription, cleanup, and paste asynchronously on a background
+        # thread so the hotkey worker thread is freed immediately.
+        threading.Thread(
+            target=self._process_recording,
+            args=(wav_path, session, current_hwnd, captured_images, capture_offsets),
+            daemon=True,
+        ).start()
+
+    def _process_recording(
+        self,
+        wav_path: Path,
+        session: Session,
+        current_hwnd: int | None,
+        captured_images: list[Path],
+        capture_offsets: list[float],
+    ) -> None:
         try:
             segments = self._asr.transcribe_segments(wav_path)
             raw_text = " ".join(text for _start, _end, text in segments)
             cleaned_text = self._pipeline.run(raw_text)
             logger.info("Transcribed: %r", cleaned_text)
 
-            final_text = cleaned_text + self._build_capture_references(segments)
+            final_text = cleaned_text + self._build_capture_references(segments, captured_images, capture_offsets)
 
-            session = self._current_session
             session.transcript = final_text
-            session.image_paths = list(self._captured_images)
+            session.image_paths = list(captured_images)
             save_session(session)
 
-            if not raw_text.strip() and not self._captured_images:
+            if not raw_text.strip() and not captured_images:
                 logger.info("Recording finished but no speech was detected (empty transcription).")
                 self.signals.no_speech_detected.emit()
             else:
-                if self._current_hwnd is not None:
-                    restored = restore_foreground_window(self._current_hwnd)
+                if current_hwnd is not None:
+                    restored = restore_foreground_window(current_hwnd)
                     if not restored:
                         # Clipboard still has the transcript even though the
                         # paste below will likely land nowhere useful -- better
@@ -292,16 +333,11 @@ class RecordingController:
                             "Focus could not be restored to the original window; "
                             "pasting anyway, but it may not land in the right place"
                         )
-                paste_transcript(final_text, self._captured_images)
+                paste_transcript(final_text, captured_images)
+            self.signals.recording_finished.emit(final_text)
         except Exception as exc:
             logger.error("Transcription/cleanup/paste failed", exc_info=True)
             self.signals.error.emit(str(exc))
-            self._current_session = None
-            self._current_hwnd = None
+        finally:
+            self._processing = False
             self._hotkeys.reset_active_mode()
-            return
-
-        self._current_session = None
-        self._current_hwnd = None
-        self._hotkeys.reset_active_mode()
-        self.signals.recording_finished.emit(final_text)

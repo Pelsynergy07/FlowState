@@ -809,7 +809,7 @@ class SettingsWindow(QDialog):
                 self._update_status_lbl.setText(f"You are running the latest release (v{__version__}).")
 
         signals.checked.connect(_on_checked)
-        check_for_update_async(signals)
+        check_for_update_async(signals, force=True)
 
     def _trigger_update_install(self) -> None:
         if self._update_info and self._on_update_requested:

@@ -97,6 +97,8 @@ def build_stylesheet() -> str:
         color: {INK};
         background: transparent;
         border: none;
+        padding-top: 1px;
+        padding-bottom: 2px;
     }}
 
     QLabel[role="eyebrow"] {{
@@ -117,7 +119,6 @@ def build_stylesheet() -> str:
     QLabel[role="muted"] {{
         color: {MUTED_TEXT};
         font-size: 13px;
-        line-height: 1.4;
     }}
 
     QFrame[role="card"] {{
@@ -173,11 +174,11 @@ def build_stylesheet() -> str:
     QPushButton {{
         background-color: #FFFFFF;
         color: {INK};
-        border: 2.5px solid {BORDER};
-        border-right: 4px solid {BORDER};
-        border-bottom: 4px solid {BORDER};
+        border: 2px solid {BORDER};
+        border-right: 3.5px solid {BORDER};
+        border-bottom: 3.5px solid {BORDER};
         border-radius: {RADIUS}px;
-        padding: 9px 20px;
+        padding: 6px 18px;
         font-family: "{FONT_FAMILY_STICKER}";
         font-weight: 700;
         font-size: 12px;
@@ -186,8 +187,8 @@ def build_stylesheet() -> str:
 
     QPushButton:hover {{
         background-color: #FAF6EF;
-        border-right: 4.5px solid {BORDER};
-        border-bottom: 4.5px solid {BORDER};
+        border-right: 4px solid {BORDER};
+        border-bottom: 4px solid {BORDER};
     }}
 
     QPushButton:pressed {{
@@ -212,6 +213,7 @@ def build_stylesheet() -> str:
         border: 2px solid {BORDER};
         border-right: 3.5px solid {BORDER};
         border-bottom: 3.5px solid {BORDER};
+        padding: 6px 18px;
     }}
 
     QPushButton[role="secondary"]:hover {{
@@ -229,9 +231,10 @@ def build_stylesheet() -> str:
     QPushButton[role="accent"], QPushButton[role="primary"] {{
         background-color: {INK};
         color: #FFFFFF;
-        border: 2.5px solid {BORDER};
-        border-right: 4px solid #000000;
-        border-bottom: 4px solid #000000;
+        border: 2px solid {BORDER};
+        border-right: 3.5px solid #000000;
+        border-bottom: 3.5px solid #000000;
+        padding: 6px 18px;
     }}
 
     QPushButton[role="accent"]:hover, QPushButton[role="primary"]:hover {{
@@ -252,7 +255,7 @@ def build_stylesheet() -> str:
         border-right: 3px solid {BORDER};
         border-bottom: 3px solid {BORDER};
         border-radius: {RADIUS}px;
-        padding: 8px 12px;
+        padding: 6px 10px;
         font-size: 13px;
         color: {INK};
         selection-background-color: {INK};
@@ -266,18 +269,19 @@ def build_stylesheet() -> str:
         outline: none;
     }}
 
-    /* QComboBox and Dropdown List View (Image 4 reference style) */
+    /* QComboBox and Dropdown List View */
     QComboBox {{
         background-color: {PAPER_RAISED};
-        border: 2.5px solid {BORDER};
+        border: 2px solid {BORDER};
         border-right: 3.5px solid {BORDER};
         border-bottom: 3.5px solid {BORDER};
         border-radius: {RADIUS}px;
-        padding: 8px 12px;
-        padding-right: 36px;
-        font-size: 13px;
+        padding: 4px 10px;
+        padding-right: 34px;
+        font-size: 12.5px;
         font-weight: 600;
         color: {INK};
+        min-height: 26px;
     }}
 
     QComboBox:hover {{

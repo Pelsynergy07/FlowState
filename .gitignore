@@ -11,3 +11,4 @@ packaging/dist_installer/
 *.exe
 *.log
 .vscode/
+preview.bat

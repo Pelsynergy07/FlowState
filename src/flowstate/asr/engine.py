@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from pathlib import Path
 
 from . import models
@@ -24,6 +25,55 @@ from .. import paths
 from ..cuda_support import ensure_cuda_dll_search_paths
 
 logger = logging.getLogger("flowstate.asr")
+
+
+def _is_valid_model_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    model_bin = path / "model.bin"
+    if not model_bin.is_file() or model_bin.stat().st_size == 0:
+        return False
+    return True
+
+
+def _find_model_dir(base_dir: Path) -> Path | None:
+    if _is_valid_model_dir(base_dir):
+        return base_dir
+    if base_dir.is_dir():
+        for mb in base_dir.rglob("model.bin"):
+            if mb.is_file() and mb.stat().st_size > 0:
+                parent = mb.parent
+                if (parent / "config.json").is_file():
+                    return parent
+    return None
+
+
+def _clean_corrupt_model_dir(path: Path) -> None:
+    if path.exists() and not _is_valid_model_dir(path):
+        import shutil
+
+        logger.warning("Cleaning corrupted model directory: %s", path)
+        try:
+            shutil.rmtree(path)
+        except Exception:
+            logger.warning("Failed to remove corrupt model directory: %s", path, exc_info=True)
+
+
+def _ensure_model_dir(spec: models.ModelSpec) -> Path:
+    target_dir = paths.models_dir() / spec.id
+    found = _find_model_dir(target_dir)
+    if found is not None:
+        return found
+    _clean_corrupt_model_dir(target_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    from huggingface_hub import snapshot_download
+
+    logger.info("Downloading speech model %s (%s) to %s", spec.id, spec.ct2_repo, target_dir)
+    snapshot_download(repo_id=spec.ct2_repo, local_dir=str(target_dir))
+    found = _find_model_dir(target_dir)
+    if found is None:
+        raise RuntimeError(f"Model download completed but model.bin not found in {target_dir}")
+    return found
 
 
 class TranscriptionEngine:
@@ -48,13 +98,16 @@ class TranscriptionEngine:
         # the hotkey immediately at launch can both call transcribe() ->
         # _load() at nearly the same time.
         self._load_lock = threading.Lock()
-        # Set once _load_locked() fails outright (both CUDA and CPU
-        # attempts, or a CPU-only load) -- without this, every recording
-        # attempt after a failed download independently retries the whole
-        # multi-GB download from scratch, so a genuinely broken network
-        # turns into a fresh multi-minute stall on every single hotkey
-        # press instead of a clear, immediate error after the first one.
+        # Cooldown-based load failure: if loading fails, remember the error
+        # for a cooldown period so rapid hotkey presses fail fast without
+        # hammering the network/disk, but allow retrying after the cooldown.
         self._load_failure: str | None = None
+        self._last_failure_time: float = 0.0
+        self._failure_cooldown_seconds: float = 300.0  # 5-minute cooldown
+
+    @property
+    def is_ready(self) -> bool:
+        return self._model is not None
 
     @property
     def active_device(self) -> str | None:
@@ -107,11 +160,17 @@ class TranscriptionEngine:
         with self._load_lock:
             if self._model is not None:  # another thread won the race
                 return
+            now = time.time()
             if self._load_failure is not None:
-                raise RuntimeError(self._load_failure)
+                if now - self._last_failure_time < self._failure_cooldown_seconds:
+                    raise RuntimeError(self._load_failure)
+                # Cooldown expired: allow retrying
+                self._load_failure = None
             try:
                 self._load_locked()
+                self._load_failure = None
             except Exception as exc:
+                self._last_failure_time = time.time()
                 self._load_failure = self._describe_load_error(exc)
                 raise RuntimeError(self._load_failure) from exc
 
@@ -150,11 +209,11 @@ class TranscriptionEngine:
         if want_cuda:
             spec = models.get_model_spec(self._requested_model_id)
             try:
+                model_dir = _ensure_model_dir(spec)
                 candidate = WhisperModel(
-                    spec.ct2_repo,
+                    str(model_dir),
                     device="cuda",
                     compute_type=spec.gpu_compute_type,
-                    download_root=str(paths.models_dir() / spec.id),
                 )
                 self._verify_model_runs(candidate)
                 self._model = candidate
@@ -177,11 +236,11 @@ class TranscriptionEngine:
         else:
             cpu_model_id = self._requested_model_id
         spec = models.get_model_spec(cpu_model_id)
+        model_dir = _ensure_model_dir(spec)
         self._model = WhisperModel(
-            spec.ct2_repo,
+            str(model_dir),
             device="cpu",
             compute_type=spec.cpu_compute_type,
-            download_root=str(paths.models_dir() / spec.id),
         )
         self._active_model_id = spec.id
         self._active_device = "cpu"
