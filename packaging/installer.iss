@@ -3,7 +3,7 @@
 ; constants, so this installer is meant to run on any Windows 11 machine.
 
 #define MyAppName "FlowState"
-#define MyAppVersion "0.1.6"
+#define MyAppVersion "0.1.7"
 #define MyAppPublisher "FlowState"
 #define MyAppExeName "FlowState.exe"
 
@@ -20,7 +20,8 @@ AppMutex=Global\FlowStateSingleInstance
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-DisableDirPage=yes
+DisableDirPage=no
+ExtraDiskSpaceRequired=2147483648
 OutputDir=dist_installer
 OutputBaseFilename=FlowStateSetup
 Compression=lzma2
@@ -41,6 +42,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 BeveledLabel=SYS.01 // FLOWSTATE SETUP // v{#MyAppVersion}
 WelcomeLabel1=FlowState Setup
 WelcomeLabel2=Local, offline voice dictation for Windows.%n%n• Real-time speech transcription & smart LLM cleanup%n• Spatial visual context capture with zero cloud telemetry%n• Private, on-device AI models%n%nClick Next to proceed with installation.
+SelectDirLabel3=Setup will install FlowState into the following folder. At least 4.5 GB of free disk space is recommended for the application binaries and local offline AI models.
 
 
 [Tasks]

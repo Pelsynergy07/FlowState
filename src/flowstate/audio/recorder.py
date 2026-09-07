@@ -30,7 +30,29 @@ class Recorder:
         self._device_index = device_index
         self._queue: queue.Queue[np.ndarray] = queue.Queue()
         self._stream: sd.InputStream | None = None
-        self._samplerate = TARGET_SAMPLERATE
+        self._samplerate = self._detect_samplerate()
+
+    def _detect_samplerate(self) -> int:
+        try:
+            sd.check_input_settings(
+                device=self._device_index,
+                samplerate=TARGET_SAMPLERATE,
+                channels=CHANNELS,
+                dtype=DTYPE,
+            )
+            return TARGET_SAMPLERATE
+        except Exception:
+            pass
+
+        try:
+            idx = self._device_index if self._device_index is not None else sd.default.device[0]
+            if idx is not None and idx >= 0:
+                device_info = sd.query_devices(idx)
+                if isinstance(device_info, dict):
+                    return int(device_info.get("default_samplerate", TARGET_SAMPLERATE))
+        except Exception:
+            pass
+        return TARGET_SAMPLERATE
 
     def _callback(self, indata, frames, time_info, status) -> None:
         if status:
@@ -42,15 +64,14 @@ class Recorder:
         try:
             self._stream = sd.InputStream(
                 device=self._device_index,
-                samplerate=TARGET_SAMPLERATE,
+                samplerate=self._samplerate,
                 channels=CHANNELS,
                 dtype=DTYPE,
                 callback=self._callback,
             )
-            self._samplerate = TARGET_SAMPLERATE
             self._stream.start()
         except Exception:
-            logger.warning("16kHz capture unsupported by this device; using its default rate", exc_info=True)
+            logger.warning("Primary samplerate %d failed; falling back to device query rate", self._samplerate, exc_info=True)
             device_index = self._device_index if self._device_index is not None else sd.default.device[0]
             device_info = sd.query_devices(device_index)
             fallback_rate = int(device_info["default_samplerate"])
@@ -63,6 +84,22 @@ class Recorder:
             )
             self._samplerate = fallback_rate
             self._stream.start()
+
+    def abort_and_close(self) -> None:
+        """Safely stops and releases stream without saving audio."""
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+            except Exception:
+                break
+
 
     def stop_and_save(self, wav_path: Path) -> Path:
         if self._stream is not None:

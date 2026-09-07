@@ -123,15 +123,35 @@ class RecordingController:
     def stop(self) -> None:
         self._hotkeys.stop()
 
+    def switch_microphone(self, device_name: str | None) -> None:
+        """Dynamically switches active microphone device at runtime without requiring restart."""
+        if self._recording:
+            try:
+                self.stop_recording()
+            except Exception:
+                pass
+
+        if self._recorder is not None:
+            self._recorder.abort_and_close()
+
+        try:
+            import sounddevice as sd
+            sd._terminate()
+            sd._initialize()
+        except Exception:
+            pass
+
+        new_device_index = self._resolve_device_index(device_name)
+        self._recorder = Recorder(device_index=new_device_index)
+        logger.info("Microphone switched to: %r (device_index=%s)", device_name, new_device_index)
+
     def apply_config_change(self) -> None:
         """Re-reads shortcut/cleanup settings from config_store.config."""
         cfg = self.config_store.config
         self._hotkeys.set_bindings(cfg.shortcuts.toggle, cfg.shortcuts.push_to_talk)
         self._pipeline.vocabulary_enabled = cfg.cleanup.vocabulary_enabled
         self._pipeline.grammar_enabled = cfg.cleanup.grammar_enabled
-        new_device_index = self._resolve_device_index(cfg.general.microphone_device)
-        if not self._recording:
-            self._recorder = Recorder(device_index=new_device_index)
+        self.switch_microphone(cfg.general.microphone_device)
 
     def get_input_level(self) -> float:
         """Current mic input level (0..1), for a HUD level meter."""

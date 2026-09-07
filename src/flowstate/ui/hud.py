@@ -77,7 +77,7 @@ class RecordingHUD(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         # Compact width & height with uniform margins
-        self.resize(172, 46)
+        self.resize(176, 46)
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
@@ -112,6 +112,8 @@ class RecordingHUD(QWidget):
 
     def show_processing(self) -> None:
         self._state = "processing"
+        if not self._timer.isActive():
+            self._timer.start(_METER_UPDATE_MS)
         self.update()
 
     def show_notice(self, message: str = "No speech detected (check mic)", duration_ms: int = 2500) -> None:
@@ -207,17 +209,27 @@ class RecordingHUD(QWidget):
             painter.drawText(QRectF(text_x + 55, 4, 30, h), Qt.AlignLeft | Qt.AlignVCenter, f".{tenths}")
 
         elif self._state == "processing":
-            # Clean icon on left
+            # 1. Lively spinning diamond sparkle emblem with Signal Lime pulsing core
             cx = 22.0
-            _draw_diamond_emblem(painter, cx, cy, 7.5, QColor(INK))
+            painter.save()
+            painter.translate(cx, cy)
+            angle = (self._phase * 40.0) % 360.0
+            painter.rotate(angle)
+            _draw_diamond_emblem(painter, 0, 0, 7.8, QColor(INK))
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(PAPER_RAISED))
-            painter.drawEllipse(QPointF(cx, cy), 1.8, 1.8)
+            core_r = 1.8 + 0.6 * math.sin(self._phase * 2.5)
+            painter.setBrush(QColor(LIME))
+            painter.drawEllipse(QPointF(0, 0), core_r, core_r)
+            painter.restore()
 
-            # Pure clean "Formatting..." text with uniform padding
+            # 2. Human-like "Polishing..." text with dynamic animated ellipsis
+            dots = "." * (int(self._phase * 1.5) % 3 + 1)
+            display_text = f"Polishing{dots}"
+
             painter.setPen(QColor(INK))
             painter.setFont(make_font(FONT_FAMILY_DISPLAY, 18, italic=True))
-            painter.drawText(QRectF(38, 2, w - 44, h), Qt.AlignLeft | Qt.AlignVCenter, "Formatting...")
+            painter.drawText(QRectF(40, 2, w - 44, h), Qt.AlignLeft | Qt.AlignVCenter, display_text)
+
 
         elif self._state == "notice":
             cx = 20.0

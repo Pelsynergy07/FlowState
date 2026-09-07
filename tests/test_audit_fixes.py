@@ -167,3 +167,27 @@ def test_app_processing_flag_blocks_new_recording():
 
     controller.start_recording()
     assert not controller.is_recording
+
+
+def test_app_switch_microphone_terminates_and_recreates_recorder(tmp_path):
+    store = ConfigStore(path=tmp_path / "config.json")
+    controller = RecordingController(config_store=store)
+
+    fake_device = MagicMock()
+    fake_device.name = "Studio Condenser Mic"
+    fake_device.index = 9
+
+    with patch("flowstate.app.list_input_devices", return_value=[fake_device]):
+        controller.switch_microphone("Studio Condenser Mic")
+        assert controller._recorder._device_index == 9
+
+
+def test_hud_processing_state_timer(qapp):
+    from flowstate.ui.hud import RecordingHUD
+    hud = RecordingHUD()
+    hud.show_processing()
+    assert hud._state == "processing"
+    assert hud._timer.isActive()
+    hud.hide_recording()
+    assert not hud._timer.isActive()
+

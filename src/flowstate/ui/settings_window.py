@@ -167,6 +167,12 @@ class SettingsWindow(QDialog):
 
         button_row = QHBoxLayout()
         button_row.addStretch(1)
+        restart_btn = QPushButton("↺ Restart App")
+        restart_btn.setProperty("role", "secondary")
+        restart_btn.setToolTip("Relaunch FlowState cleanly to reset all audio and GPU drivers")
+        restart_btn.clicked.connect(self._restart_app)
+        button_row.addWidget(restart_btn)
+        button_row.addStretch(1)
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setProperty("role", "secondary")
         cancel_btn.clicked.connect(self.reject)
@@ -175,6 +181,11 @@ class SettingsWindow(QDialog):
         button_row.addWidget(cancel_btn)
         button_row.addWidget(save_btn)
         outer.addLayout(button_row)
+
+    def _restart_app(self) -> None:
+        from .restart import restart_flowstate
+        self.accept()
+        restart_flowstate()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -233,7 +244,24 @@ class SettingsWindow(QDialog):
             self.mic_combo.addItem(d.name, d.name)
         idx = self.mic_combo.findData(cfg.microphone_device)
         self.mic_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        layout.addWidget(_card(_eyebrow("01 / Microphone"), self.mic_combo))
+        self.mic_combo.currentIndexChanged.connect(self._on_mic_selected)
+
+        mic_meta_widget = QWidget()
+        mic_meta_row = QHBoxLayout(mic_meta_widget)
+        mic_meta_row.setContentsMargins(0, 0, 0, 0)
+        mic_meta_row.setSpacing(8)
+        self.mic_status_lbl = QLabel("✓ Live audio stream connected")
+        self.mic_status_lbl.setProperty("role", "mono")
+        self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
+        mic_meta_row.addWidget(self.mic_status_lbl, 1)
+
+        restart_mic_btn = QPushButton("↺ RESTART TO RESET AUDIO")
+        restart_mic_btn.setProperty("role", "secondary")
+        restart_mic_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; padding: 4px 10px;")
+        restart_mic_btn.clicked.connect(self._restart_app)
+        mic_meta_row.addWidget(restart_mic_btn)
+
+        layout.addWidget(_card(_eyebrow("01 / Microphone"), self.mic_combo, mic_meta_widget))
 
         self.launch_at_login = BrutalistCheckBox("Launch FlowState automatically when Windows starts", checked=cfg.launch_at_login)
         self.sound_cues = BrutalistCheckBox("Play acoustic sound cue when recording starts/stops", checked=cfg.sound_cues)
@@ -241,6 +269,18 @@ class SettingsWindow(QDialog):
 
         layout.addStretch(1)
         return page
+
+    def _on_mic_selected(self) -> None:
+        new_mic = self.mic_combo.currentData()
+        self.config_store.config.general.microphone_device = new_mic
+        self.config_store.save()
+        if self._controller and hasattr(self._controller, "switch_microphone"):
+            self._controller.switch_microphone(new_mic)
+        elif self._on_applied:
+            self._on_applied()
+        self.mic_status_lbl.setText("✓ Audio stream switched live (ready)")
+        self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
+
 
     # -- Shortcuts --------------------------------------------------------
     def _build_shortcuts_tab(self) -> QWidget:

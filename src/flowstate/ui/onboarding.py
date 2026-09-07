@@ -446,7 +446,9 @@ class OnboardingDialog(QDialog):
         new_mic = self.mic_combo.currentData()
         self._controller.config_store.config.general.microphone_device = new_mic
         self._controller.config_store.save()
-        if hasattr(self._controller, "apply_config_change"):
+        if hasattr(self._controller, "switch_microphone"):
+            self._controller.switch_microphone(new_mic)
+        elif hasattr(self._controller, "apply_config_change"):
             self._controller.apply_config_change()
         logger.info("Microphone updated in onboarding: %r", new_mic)
 
