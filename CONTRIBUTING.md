@@ -15,7 +15,7 @@ Before writing code, please keep FlowState's core design principles in mind:
 3. **Rock-Solid Windows Reliability**:
    Low-level global keyboard and mouse hooks must be fail-safe, memory-efficient, and non-blocking. Background threads must never touch Qt widgets directly—all UI communication must route through Qt Signals.
 
-For an exhaustive, plain-English breakdown of every component and design decision, read [**ARCHITECTURE.md**](ARCHITECTURE.md).
+For a plain-English breakdown of every component and AI model, read [**HOW_IT_WORKS.md**](HOW_IT_WORKS.md).
 
 ---
 

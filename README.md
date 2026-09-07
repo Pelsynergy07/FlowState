@@ -10,7 +10,7 @@
 
 ### *High-speed, 100% offline voice dictation with screen-context grounding for Windows.*
 
-[**Download Installer (v1.0.0 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.0-beta/FlowStateSetup.exe) • [**Architecture Blueprint**](ARCHITECTURE.md) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
+[**Download Installer (v1.0.0 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.0-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
@@ -86,7 +86,7 @@ FlowState hot-reloads this file automatically without needing a restart.
 | **Desktop UI** | `PySide6` (Qt for Python) | Neo-brutalist, DPI-scaled desktop shell with tray menus, waveform HUD, and settings. |
 | **Input Interception** | Low-Level Windows API Hooks | Win32 keyboard & mouse hooks (`pynput` / `pywin32`) for reliable global hotkeys. |
 
-For an in-depth architectural breakdown written for both developers and curious minds, see [**ARCHITECTURE.md**](ARCHITECTURE.md).
+For a plain-English explanation of the pipeline and local AI models, see [**HOW_IT_WORKS.md**](HOW_IT_WORKS.md).
 
 ---
 
