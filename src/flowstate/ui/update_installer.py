@@ -130,6 +130,7 @@ class UpdateInstallDialog(QDialog):
             return
         self.succeeded = True
         self.accept()
+        QTimer.singleShot(100, lambda: os._exit(0))
 
     def _on_failed(self, message: str) -> None:
         box = QMessageBox(self)

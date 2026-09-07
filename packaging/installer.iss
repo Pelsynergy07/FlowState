@@ -3,7 +3,7 @@
 ; constants, so this installer is meant to run on any Windows 11 machine.
 
 #define MyAppName "FlowState"
-#define MyAppVersion "0.1.8"
+#define MyAppVersion "1.0.0-beta"
 #define MyAppPublisher "FlowState"
 #define MyAppExeName "FlowState.exe"
 
@@ -61,11 +61,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FlowState"; ValueData: """{app}\{#MyAppExeName}"" --autostart"; Tasks: launchatlogin; Flags: uninsdeletevalue
 
 [Run]
-; No skipifsilent: a silent run (VERYSILENT) is exactly what updater.py's
-; self-update flow uses, and it depends on FlowState relaunching itself
-; afterwards -- unlike a normal silent enterprise deployment, this is
-; always user-initiated from inside the app, so auto-launch is wanted.
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: WizardSilent
 
 [Code]
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

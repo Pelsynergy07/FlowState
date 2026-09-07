@@ -95,5 +95,5 @@ def test_launch_installer_and_exit_invokes_silent_install_flags(tmp_path):
     args, kwargs = mock_popen.call_args
     command = args[0]
     assert command[0] == str(installer_path)
-    for flag in ("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"):
+    for flag in ("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"):
         assert flag in command

@@ -94,7 +94,7 @@ def launch_installer_and_exit(installer_path: Path) -> None:
     slow to exit on its own."""
     args = [
         str(installer_path),
-        "/VERYSILENT",
+        "/SILENT",
         "/SUPPRESSMSGBOXES",
         "/NORESTART",
         "/SP-",
