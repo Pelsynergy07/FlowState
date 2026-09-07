@@ -1,178 +1,137 @@
 # FlowState
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<div align="center">
 
-Local, offline voice dictation for Windows: press a hotkey, speak, and the
-cleaned-up transcript is pasted into whatever text field was focused.
-While recording, circle something on screen (or Ctrl+drag a box) to
-capture an annotated screenshot alongside the transcript.
+[![Release](https://img.shields.io/badge/Release-v1.0.0--beta-blue.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/tag/v1.0.0-beta)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=for-the-badge&logo=windows)](https://github.com/Pelsynergy07/FlowState/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline%20%7C%20Zero%20Telemetry-10B981.svg?style=for-the-badge)](HOW_IT_WORKS.md)
 
-Everything runs on your machine -- speech-to-text and text cleanup are both
-local AI models, nothing is sent anywhere over the network.
+### *High-speed, 100% offline voice dictation with screen-context grounding for Windows.*
 
-Inspired by [better-voice](https://github.com/TarunTomar122/better-voice)
-(macOS-only) -- FlowState is a from-scratch Windows implementation of the
-same idea, not a port. See [HOW_IT_WORKS.md](HOW_IT_WORKS.md) for a
-plain-English explanation of the architecture and the AI models involved.
+[**Download Installer (v1.0.0 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.0-beta/FlowStateSetup.exe) • [**Architecture Blueprint**](ARCHITECTURE.md) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
-## Installing
+</div>
 
-Grab `FlowStateSetup.exe` from the
-[latest release](../../releases/latest) and run it -- no admin rights
-needed. On first launch FlowState downloads its AI models -- the speech
-model (~1.6GB with a GPU, ~150MB without one) plus a small local model for
-text cleanup (~1.1GB, downloaded either way) -- then works fully offline.
+---
 
-**Requirements:** Windows 10 or 11, 64-bit. An NVIDIA GPU is optional --
-if one isn't found, FlowState automatically switches to a smaller,
-CPU-friendly model, and says so in Settings -> Model. No Python or other
-tooling needs to be installed separately; the installer is self-contained.
+## ⚡ What is FlowState?
 
-## Using it
+**FlowState** brings effortless voice dictation to Windows without sending your voice or thoughts to cloud servers. Press a hotkey anywhere, speak naturally, and FlowState transcribes your speech, reformats it with a local AI language model into clean prose, and pastes it directly into your active window.
 
-- **Toggle:** `Ctrl+Shift+Space` starts a hands-free recording; press again
-  to stop, clean up, and paste.
-- **Push-to-talk:** hold `Alt` (right) to record, release to paste.
-- Both shortcuts are rebindable in Settings -> Shortcuts. If you rebind
-  either one, keep them from sharing all their keys with each other (e.g.
-  don't set push-to-talk to `shift+space` while the toggle is
-  `ctrl+shift+space`) -- FlowState will refuse to save a combination like
-  that and explain why, since a quick tap of the longer one would get
-  misread as the shorter one.
-- **Screenshots:** while recording, either draw a loop with the mouse
-  (circle mode) or hold Ctrl and drag a box (drag mode) to capture and
-  annotate a screenshot alongside the transcript -- pick the mode in
-  Settings -> Capture.
-- Recent sessions (transcript + any screenshots) are available from the
-  tray icon and in Settings -> History.
+While dictating, you can circle an element on your screen (or Ctrl+drag a box) to capture and attach an annotated screenshot synchronized with your speech timestamps.
 
-## Your own vocabulary
+Everything runs **100% locally on your machine**:
+* 🔒 **Zero Cloud Telemetry**: No audio, transcripts, or personal data ever leaves your computer.
+* 🚀 **Instant Hardware Acceleration**: Utilizes your NVIDIA GPU via CUDA, or automatically switches to an optimized CPU engine if no GPU is present.
+* 🎨 **Tactile Neo-Brutalist Interface**: Physical 3D filing folder tabs, mechanical button depressions, and paper-textured aesthetics designed with love.
+* 🔄 **Seamless Auto-Updates**: 1-click built-in updater with live progress tracking and automatic relaunch.
 
-FlowState ships with a built-in pass that fixes common casing --
-`github` -> `GitHub`, `json` -> `JSON`, and so on -- but it can't know
-`kubectl`, an internal project name, or a colleague's surname. Add your
-own by creating (or editing):
+---
 
-```
-%LOCALAPPDATA%\FlowState\vocabulary_user.json
-```
+## 📥 Installation
 
+Grab the standalone setup installer from our latest release:
+
+👉 **[Download FlowStateSetup.exe (~1.06 GB)](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.0-beta/FlowStateSetup.exe)**
+
+* **System Requirements**: Windows 10 or 11 (64-bit).
+* **Hardware**:
+  * **GPU Mode (Recommended)**: NVIDIA GPU with CUDA support runs Whisper `large-v3-turbo` for near-instant transcription.
+  * **CPU Mode**: Automatic fallback to lightweight Whisper `base.en` on multi-core CPUs.
+* **No Prerequisites**: No Python, CUDA toolkits, or external dependencies required. The installer is completely self-contained.
+
+> [!TIP]
+> On first launch, FlowState displays an interactive setup dialog that downloads the local open-weights AI models (~1.6 GB for GPU Whisper + ~1.1 GB for Qwen2.5 text cleanup) directly from Hugging Face. After this initial one-time download, FlowState functions entirely offline.
+
+---
+
+## 🎯 How to Use
+
+### 🎙️ Voice Dictation
+* **Hands-Free Toggle**: Press `Ctrl + Shift + Space` to begin recording. Speak at your natural pace. Press the combination again to stop, format, and paste.
+* **Push-to-Talk**: Hold `Right Alt` while speaking; release the key to immediately format and paste.
+* **Custom Shortcuts**: Fully customizable in **Settings → Shortcuts**. FlowState includes built-in collision prevention to avoid conflicting key combinations.
+
+### 📸 Visual Context Grounding (Screenshots)
+Capture screenshots without interrupting your train of thought:
+1. Start dictating (e.g., *"Look at this button styling here..."*).
+2. **Circle Mode**: Draw a loop around any UI element on your screen with your mouse.
+3. **Drag Mode**: Hold `Ctrl` and drag a rectangle over the target area.
+4. When you finish recording, FlowState saves the annotated screenshot and inserts a clear context marker at the end of your transcript.
+
+### 📚 Custom Personal Vocabulary
+Fix uncommon names, acronyms, or technical jargon:
+Create or edit `%LOCALAPPDATA%\FlowState\vocabulary_user.json`:
 ```json
 {
   "cube cuttle": "kubectl",
-  "engine x": "nginx"
+  "engine x": "nginx",
+  "pi torch": "PyTorch",
+  "pelsynergy": "Pelsynergy"
 }
 ```
+FlowState hot-reloads this file automatically without needing a restart.
 
-The key is what the transcript tends to say, the value is what you
-meant. Matching is whole-word and case-insensitive, and longer phrases
-win over a shorter one contained inside them, so `"ci cd"` beats a bare
-`"ci"`. The file is re-read automatically whenever it changes -- no
-restart needed. A term you list here overrides the built-in spelling for
-that same word. One rule worth respecting: don't map an ordinary word
-(e.g. `"read me"`) to something else -- it'll rewrite every sentence that
-happens to contain that phrase. A malformed file is just ignored rather
-than breaking transcription.
+---
 
-## Clipboard behavior
+## 🏛️ Architecture & AI Engine
 
-When you stop recording, FlowState puts the cleaned-up transcript on
-your clipboard and sends one Ctrl+V into whichever window was focused
-when you *started* recording, then restores whatever was on your
-clipboard before. If you captured any screenshots, each one gets pasted
-the same way right after, as its own separate Ctrl+V -- deliberately one
-item per paste, since putting text and an image on the clipboard
-together made some apps (browsers, chat inputs that accept image paste)
-treat the whole thing as an image attach and silently drop the text.
-Your original clipboard content is restored once everything's landed.
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Speech-to-Text** | `faster-whisper` (CTranslate2) | High-speed local Whisper speech recognition (`large-v3-turbo` on CUDA / `base.en` on CPU). |
+| **Text Structuring** | `llama-cpp-python` (`Qwen2.5-1.5B-Instruct`) | CPU-only local LLM reformatting raw stream-of-consciousness into structured lists and punctuation. |
+| **Visual Grounding** | `mss` + `Pillow` + Native Hooks | Gesture detection (circle bounding & rectangle drag) with timestamped annotation. |
+| **Desktop UI** | `PySide6` (Qt for Python) | Neo-brutalist, DPI-scaled desktop shell with tray menus, waveform HUD, and settings. |
+| **Input Interception** | Low-Level Windows API Hooks | Win32 keyboard & mouse hooks (`pynput` / `pywin32`) for reliable global hotkeys. |
 
-## Privacy and storage
+For an in-depth architectural breakdown written for both developers and curious minds, see [**ARCHITECTURE.md**](ARCHITECTURE.md).
 
-- Speech-to-text and text cleanup both run locally. The only network
-  activity FlowState ever does is downloading its models from Hugging
-  Face, once, the first time each is needed -- nothing about your voice
-  or transcripts is ever sent anywhere.
-- Models live in `%LOCALAPPDATA%\FlowState\models\`: the speech model
-  (Whisper `large-v3-turbo` on a GPU, or the smaller `base.en` on CPU)
-  and a small local LLM used for text cleanup.
-- Sessions (transcript + any screenshots) are saved to
-  `%LOCALAPPDATA%\FlowState\sessions\`, kept for 7 days, and capped at
-  500MB total -- oldest deleted first once that's exceeded.
-- Settings live in `config.json`, logs in `logs\flowstate.log`, both
-  under the same `%LOCALAPPDATA%\FlowState` folder.
-- Uninstalling deliberately leaves this folder alone (so an upgrade or
-  reinstall doesn't wipe your models and history) -- delete it by hand
-  if you want a fully clean removal.
+---
 
-## Troubleshooting
+## 🔒 Privacy & Storage
 
-- **A shortcut does nothing:** open Settings -> Shortcuts. Toggle and
-  push-to-talk can't share all their keys with each other (e.g. don't
-  set push-to-talk to `shift+space` while the toggle is
-  `ctrl+shift+space`) -- FlowState refuses to save a combination like
-  that, since a quick tap of the longer one gets misread as the shorter
-  one. If both look fine, check `%LOCALAPPDATA%\FlowState\logs\flowstate.log`
-  for `Keyboard hook installed`; if that line is missing, restart
-  FlowState.
-- **"FlowState is already running" but you don't see the tray icon:** a
-  previous instance may still be holding the single-instance lock. Check
-  Task Manager for a leftover `FlowState.exe` (or `python.exe` in a dev
-  setup), end it, then relaunch.
-- **Transcript or screenshot lands in the wrong window:** FlowState
-  pastes into whichever window was focused the moment you *started*
-  recording -- if you switch windows mid-recording, that's where it'll
-  land.
-- **Transcription feels slow:** check Settings -> Model. If it says
-  "Currently running on: CPU," no compatible NVIDIA GPU/CUDA was found,
-  so FlowState fell back to a smaller model automatically -- this is
-  expected on machines without an NVIDIA GPU, just slower than GPU mode.
-- **Nothing happens for the first few seconds after launch:** the AI
-  models are still loading in the background; give it a moment, or use
-  the first-run setup dialog, which waits for both models before it lets
-  you finish.
-- **Screenshot capture isn't grabbing anything:** confirm the right mode
-  is picked in Settings -> Capture (circle vs. Ctrl+drag), and that
-  you're actively recording when you gesture -- capture only listens
-  while a recording is in progress.
-- **A model failed to download:** usually a network hiccup on first
-  launch. Just restart FlowState to retry.
+FlowState is built on an uncompromising privacy foundation:
+- **Audio & Transcripts**: Processed solely in RAM and stored locally under `%LOCALAPPDATA%\FlowState\sessions\`.
+- **Retention**: Local session history is kept for 7 days (capped at 500 MB) with oldest sessions automatically pruned.
+- **Network Boundaries**: Network access is restricted exclusively to downloading public Hugging Face model weights on initial setup and checking GitHub Releases for updates. **Zero tracking. Zero telemetry. Zero external servers.**
 
-## Development setup
+---
 
-```
+## 🛠️ Development & Contributing
+
+Contributions are warmly welcome! Whether you are polishing the UI, optimizing inference performance, or fixing bugs:
+
+### Setup Local Dev Environment
+```powershell
+# 1. Clone repository
+git clone https://github.com/Pelsynergy07/FlowState.git
+cd FlowState
+
+# 2. Create Python 3.12 virtual environment
 py -3.12 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\Activate.ps1
+
+# 3. Install dependencies & editable package
+python -m pip install -r requirements.txt
+python -m pip install -e .
+
+# 4. Run application from source
+python -m flowstate
 ```
 
-Run the app:
-
-```
-.venv\Scripts\python.exe -m flowstate
-```
-
-Run tests:
-
-```
-.venv\Scripts\python.exe -m pytest
+### Run Tests
+```powershell
+python -m pytest
 ```
 
-## Building the installer
+Please read [**CONTRIBUTING.md**](CONTRIBUTING.md) for full guidelines on code style, dynamic Qt dialog sizing, and submitting Pull Requests.
 
-```
-powershell -File packaging\build.ps1
-```
+---
 
-Produces `packaging\dist_installer\FlowStateSetup.exe`. Requires
-[Inno Setup 6](https://jrsoftware.org/isdl.php) on the machine doing the
-build (not needed by anyone just running the resulting installer).
+## 📜 License & Credits
 
-## Contributing
-
-Issues and pull requests are welcome. There's no formal process yet --
-just open an issue for bugs or ideas, or a PR if you've already got a
-fix. `.venv\Scripts\python.exe -m pytest` should stay green.
-
-## License
-
-[MIT](LICENSE).
+* **License**: Open source under the [MIT License](LICENSE).
+* **Inspiration**: Inspired by [better-voice](https://github.com/TarunTomar122/better-voice) (macOS).
+* **Crafted with love** by [**Pelsynergy**](https://github.com/Pelsynergy07).

@@ -22,4 +22,4 @@ where = ["src"]
 version = { attr = "flowstate.__version__" }
 
 [tool.setuptools.package-data]
-"flowstate.resources" = ["*.json", "fonts/*.ttf"]
+"flowstate.resources" = ["*.json", "fonts/*.ttf", "icons/*", "textures/*"]

@@ -1,14 +1,49 @@
+# Python & Virtual Environments
 .venv/
+env/
+venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+src/*.egg-info/
+
+# Testing & Linting
 .pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# PyInstaller & Inno Setup Builds
 build/
 dist/
-*.egg-info/
 packaging/build/
 packaging/dist/
 packaging/dist_installer/
 *.exe
+
+# Logs & Temporary Media
 *.log
+*.tmp
+*.wav
+*.mp3
+_smoke_*
+
+# Local Model Caches & Session Data (Runtime only)
+models/
+sessions/
+
+# IDEs & Editor Configs
 .vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+
+# OS Artifacts
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local Scratch Launchers
 preview.bat
