@@ -14,11 +14,11 @@ machine, what is it actually doing" more than at contributing code.
 3. You press the hotkey again (or release it, for push-to-talk). FlowState
    finishes the remaining audio, joins the completed sections, lays out emails
    and lists, and pastes the complete result into the text field focused when
-   you started. Slow or incomplete polishing retains the original text.
+   you started. Slow or incomplete model polishing retains the complete source
+   wording, with fast filler cleanup and layout rules still applied.
 4. Nothing about your voice or the transcript ever leaves your machine.
-   Both AI models run locally; the only network activity FlowState ever
-   does is downloading those models once, from Hugging Face, the first
-   time each is needed.
+   Both AI models run locally. Network access is used for model downloads
+   from Hugging Face and app update checks/downloads from GitHub.
 
 ## The two AI models
 
@@ -35,10 +35,11 @@ this is what turns your audio into raw text.
 like speech, not writing: run-on sentences, "number one... number
 two..." instead of an actual list, no punctuation. This model turns that
 into properly formatted text -- real numbered lists, correct
-capitalization and punctuation, a greeting/sign-off if you were clearly
-dictating a message to someone. It's given a strict instruction to only
-reformat, never to respond to or act on what you said, even if a
-transcript happens to read like a question or a command.
+capitalization and punctuation, and layout for a dictated greeting/sign-off.
+Fast rules remove clear speech fillers and accidental repetitions, recognize
+spoken list transitions, and format unambiguous dates. Model output is checked
+against the cleaned source words in order: it cannot replace your wording,
+summarize, invent content, or respond to a dictated question or command.
 
 Both models are ordinary, publicly available open models -- nothing
 proprietary or FlowState-specific about them.

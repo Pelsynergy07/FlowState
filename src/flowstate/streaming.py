@@ -10,6 +10,9 @@ from pathlib import Path
 import numpy as np
 
 from .text.structure import structure_text
+from .text.disfluency import clean_disfluencies
+from .text.dates import format_dates
+from .text.formatter import _complete_rewrite
 
 logger = logging.getLogger("flowstate.streaming")
 STEP_SECONDS = 24.0
@@ -124,7 +127,7 @@ class StreamingDictation:
         if duration > self._cursor:
             # Short recordings retain whole-message polishing. On long ones,
             # only the tail is left; give it a small final generation budget.
-            budget = 2.0 if not self._segments else 0.8
+            budget = 3.5
             # Whisper can align its last word slightly beyond the WAV's end.
             # The final window must keep it rather than treat padding as a cutoff.
             try:
@@ -132,9 +135,29 @@ class StreamingDictation:
             except Exception:
                 logger.warning("Final live window failed; recovering complete recording", exc_info=True)
                 return self._recover(wav_path)
-        return list(self._segments), structure_text(" ".join(self._cleaned))
+        joined = _join_sections(self._cleaned)
+        if self._pipeline.grammar_enabled:
+            joined = structure_text(format_dates(clean_disfluencies(joined)))
+            raw = " ".join(text for _, _, text in self._segments)
+            if not _complete_rewrite(raw, joined):
+                logger.info("Assembled formatting changed wording; using complete cleaned source.")
+                joined = structure_text(format_dates(clean_disfluencies(raw)))
+        return list(self._segments), joined
 
     def _recover(self, wav_path: Path) -> tuple[list[tuple[float, float, str]], str]:
         segments = self._engine.transcribe_segments(wav_path)
         raw = " ".join(text for _, _, text in segments)
-        return segments, structure_text(self._pipeline.run(raw, budget_seconds=0.8, allow_load=False))
+        return segments, self._pipeline.run(raw, budget_seconds=3.5, allow_load=False)
+
+
+def _join_sections(sections: list[str]) -> str:
+    """Preserve email/list line breaks at live-window boundaries."""
+    result = ""
+    for section in sections:
+        if not section.strip():
+            continue
+        starts_item = re.match(r"(?:[-*]|\d+\.)\s+", section.lstrip())
+        ends_sentence = result.rstrip().endswith((".", "!", "?", ":"))
+        separator = "\n" if starts_item or (ends_sentence and ("\n" in section or "\n" in result)) else " "
+        result = result.rstrip() + (separator if result else "") + section.lstrip()
+    return result

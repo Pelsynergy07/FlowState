@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import os
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -58,6 +59,16 @@ def _headline(text: str) -> QLabel:
     return label
 
 
+def _greeting_for_hour(hour: int) -> str:
+    if 5 <= hour < 12:
+        return "Good morning."
+    if 12 <= hour < 17:
+        return "Good afternoon."
+    if 17 <= hour < 22:
+        return "Good evening."
+    return "Hello, night owl."
+
+
 def _muted(text: str) -> QLabel:
     label = QLabel(text)
     label.setProperty("role", "muted")
@@ -88,6 +99,8 @@ def _open_path(path: Path) -> None:
 
 
 class SettingsWindow(QDialog):
+    history_cleared = Signal()
+
     def __init__(
         self,
         config_store: ConfigStore,
@@ -165,8 +178,11 @@ class SettingsWindow(QDialog):
         intro_row.setSpacing(24)
         intro = QVBoxLayout()
         intro.setSpacing(5)
-        self._page_headline = _headline("Make it yours.")
+        intro.setAlignment(Qt.AlignVCenter)
+        self._page_headline = _headline(_greeting_for_hour(datetime.now().hour))
         intro.addWidget(self._page_headline)
+        self._welcome_line = _muted("Glad you’re here. FlowState helps you turn thoughts into clear text.")
+        intro.addWidget(self._welcome_line)
         intro_row.addLayout(intro, 1)
 
         shortcut_panel = QFrame()
@@ -208,6 +224,7 @@ class SettingsWindow(QDialog):
                 page = scroll
             self.tabs.addTab(page, title)
         outer.addWidget(self.tabs, 1)
+        self.tabs.currentChanged.connect(self._on_history_tab_selected)
         outer.addWidget(_rule())
 
         button_row = QHBoxLayout()
@@ -224,6 +241,31 @@ class SettingsWindow(QDialog):
         button_row.addWidget(save_btn)
         outer.addLayout(button_row)
 
+        self._greeting_timer = QTimer(self)
+        self._greeting_timer.setInterval(60_000)
+        self._greeting_timer.timeout.connect(self._refresh_greeting)
+        self._greeting_timer.start()
+
+    def _refresh_greeting(self) -> None:
+        greeting = _greeting_for_hour(datetime.now().hour)
+        if self._page_headline.text() != greeting:
+            self._page_headline.setText(greeting)
+
+    def showEvent(self, event) -> None:
+        self._refresh_greeting()
+        self._refresh_history_list()
+        super().showEvent(event)
+
+    @Slot(int)
+    def _on_history_tab_selected(self, index: int) -> None:
+        if self.tabs.tabText(index) == "History":
+            self._refresh_history_list()
+
+    @Slot()
+    def refresh_history(self) -> None:
+        if self.isVisible():
+            self._refresh_history_list()
+
     def _restart_app(self) -> None:
         from .restart import restart_flowstate
         self.accept()
@@ -234,6 +276,7 @@ class SettingsWindow(QDialog):
         paint_paper_background(painter, self.rect())
 
     def bring_to_front(self) -> None:
+        self._refresh_history_list()
         self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
         self.show()
         self.raise_()
@@ -549,9 +592,17 @@ class SettingsWindow(QDialog):
         return page
 
     def _purge_history(self) -> None:
+        if self._controller is not None and (self._controller.is_recording or self._controller.is_processing):
+            QMessageBox.information(self, "FlowState History", "Finish recording and processing before clearing history.")
+            return
         deleted = purge_all_sessions()
         self._refresh_history_list()
-        QMessageBox.information(self, "FlowState History", f"Purged {len(deleted)} session(s) from history.")
+        self.history_cleared.emit()
+        remaining = len(list_sessions())
+        message = f"Cleared {len(deleted)} session(s) from history."
+        if remaining:
+            message += f" {remaining} session(s) could not be removed."
+        QMessageBox.information(self, "FlowState History", message)
 
     def _refresh_history_list(self) -> None:
         # Clear existing cards
@@ -561,7 +612,16 @@ class SettingsWindow(QDialog):
             if widget:
                 widget.deleteLater()
 
-        sessions = list_sessions()[:30]
+        sessions = []
+        for folder in list_sessions():
+            try:
+                transcript = (folder / "transcript.txt").read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if transcript.strip():
+                sessions.append((folder, transcript))
+            if len(sessions) == 30:
+                break
         if not sessions:
             empty_card = QFrame()
             empty_card.setObjectName("historyEmpty")
@@ -595,11 +655,7 @@ class SettingsWindow(QDialog):
             self._history_layout.addStretch(1)
             return
 
-        for folder in sessions:
-            transcript_path = folder / "transcript.txt"
-            transcript = transcript_path.read_text(encoding="utf-8").strip() if transcript_path.exists() else ""
-            if not transcript:
-                transcript = "(No transcription recorded)"
+        for folder, transcript in sessions:
 
             card = QFrame()
             card.setObjectName("historyEntry")
@@ -683,6 +739,8 @@ class SettingsWindow(QDialog):
             )
 
             def _make_copy_handler(btn: QPushButton, text: str):
+                reset_timer = QTimer(btn)
+                reset_timer.setSingleShot(True)
                 def _do_copy():
                     clipboard = QApplication.clipboard()
                     if clipboard:
@@ -702,7 +760,7 @@ class SettingsWindow(QDialog):
                         }}
                         """
                     )
-                    QTimer.singleShot(1500, lambda: _reset_btn(btn))
+                    reset_timer.start(1500)
 
                 def _reset_btn(b: QPushButton):
                     b.setText("COPY TEXT")
@@ -724,6 +782,7 @@ class SettingsWindow(QDialog):
                         """
                     )
 
+                reset_timer.timeout.connect(lambda: _reset_btn(btn))
                 return _do_copy
 
             copy_btn.clicked.connect(_make_copy_handler(copy_btn, transcript))

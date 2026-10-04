@@ -35,7 +35,6 @@ from .inject.paste import paste_transcript
 from .session.model import Session
 from .session.store import create_session, enforce_retention, save_session
 from .text.pipeline import CleanupPipeline
-from .text.structure import structure_text
 from .streaming import StreamingDictation
 
 logger = logging.getLogger("flowstate.app")
@@ -378,7 +377,7 @@ class RecordingController:
                 segments, cleaned_text = streaming.finish(wav_path)
             else:
                 segments = self._asr.transcribe_segments(wav_path)
-                cleaned_text = structure_text(self._pipeline.run(" ".join(text for _, _, text in segments)))
+                cleaned_text = self._pipeline.run(" ".join(text for _, _, text in segments))
             raw_text = " ".join(text for _start, _end, text in segments)
             # Keep the full ASR output available for recovery/debugging even if
             # formatting or pasting fails. Startup history purging still applies.

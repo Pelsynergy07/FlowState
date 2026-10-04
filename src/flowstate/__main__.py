@@ -160,6 +160,7 @@ def main() -> int:
                 nonlocal settings_dlg
                 tray.refresh_recent_sessions()
             settings_dlg.finished.connect(_on_closed)
+            settings_dlg.history_cleared.connect(tray.refresh_recent_sessions)
             settings_dlg.bring_to_front()
             logger.info("SettingsWindow brought to front successfully.")
         except Exception:
@@ -197,7 +198,11 @@ def main() -> int:
     )
     controller.signals.recording_started.connect(lambda: tray.set_recording_state(True))
     controller.signals.recording_finished.connect(lambda _text: tray.set_recording_state(False))
-    controller.signals.recording_finished.connect(lambda _text: tray.refresh_recent_sessions())
+    def refresh_session_history(_text: str) -> None:
+        tray.refresh_recent_sessions()
+        if settings_dlg is not None:
+            settings_dlg.refresh_history()
+    controller.signals.recording_finished.connect(refresh_session_history)
     controller.signals.error.connect(lambda _msg: tray.set_recording_state(False))
 
     def show_error(message: str) -> None:

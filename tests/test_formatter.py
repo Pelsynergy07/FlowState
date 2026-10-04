@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 from flowstate.text import formatter as module
-from flowstate.text.formatter import SmartFormatter, _complete_rewrite
+from flowstate.text.formatter import SmartFormatter, _complete_rewrite, _preserve_content
 
 
 def fake_formatter():
@@ -105,3 +105,26 @@ def test_stopping_recording_cancels_live_polishing_without_partial_output():
     assert closed == [True]
     assert formatter._inference_lock.acquire(blocking=False)
     formatter._inference_lock.release()
+
+
+def test_small_invented_politeness_does_not_discard_email_layout():
+    source = "dear John can we talk tomorrow thanks Pranav"
+    formatted = "Dear John,\n\nCan we talk tomorrow, please?\n\nThanks, Pranav"
+    result = _preserve_content(source, formatted)
+    assert "\n\n" in result
+    assert "please" not in result
+    assert _complete_rewrite(source, result)
+
+
+def test_missing_content_is_restored_without_discarding_list_layout():
+    source = "Buy 12 fresh eggs and two books then call John"
+    formatted = "- Buy 12 eggs and two books\n- Then call John"
+    result = _preserve_content(source, formatted)
+    assert "fresh" in result
+    assert "\n- " in result
+    assert _complete_rewrite(source, result)
+
+
+def test_summary_is_not_repaired_into_an_unrelated_layout():
+    source = "Review all 300 pages then email John and deploy at 4 pm"
+    assert _preserve_content(source, "Finish the tasks.") == source

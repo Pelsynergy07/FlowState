@@ -95,7 +95,7 @@ def test_short_audio_gets_whole_message_budget_without_model_loading(tmp_path):
     write_audio(path, np.arange(30, dtype=np.int16))
     _, result = stream.finish(path)
     assert result == "hello"
-    stream._pipeline.run.assert_called_once_with("hello", budget_seconds=2.0, allow_load=False, cancel_event=None)
+    stream._pipeline.run.assert_called_once_with("hello", budget_seconds=3.5, allow_load=False, cancel_event=None)
 
 
 def test_final_word_aligned_past_file_end_is_not_cut_off(tmp_path):

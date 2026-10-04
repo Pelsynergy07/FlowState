@@ -95,5 +95,6 @@ def purge_all_sessions() -> list[Path]:
     deleted: list[Path] = []
     for folder in list_sessions():
         shutil.rmtree(folder, ignore_errors=True)
-        deleted.append(folder)
+        if not folder.exists():
+            deleted.append(folder)
     return deleted
