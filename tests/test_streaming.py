@@ -107,3 +107,54 @@ def test_final_word_aligned_past_file_end_is_not_cut_off(tmp_path):
     write_audio(path, np.arange(30, dtype=np.int16))
     _, result = stream.finish(path)
     assert result == "essential-ending"
+
+
+def test_timestamp_jitter_does_not_drop_or_duplicate_seam_word(tmp_path):
+    class JitterEngine(TimedEngine):
+        def transcribe_words(self, path):
+            result = super().transcribe_words(path)
+            with wave.open(str(path)) as wav:
+                begin = np.frombuffer(wav.readframes(1), dtype=np.int16)[0] / wav.getframerate()
+            # In the first window the seam word is just beyond its cutoff;
+            # in the next it appears just before that cutoff. It must survive.
+            return [(a + (.2 if begin == 0 else -.2) if text == "word8" else a,
+                     b + (.2 if begin == 0 else -.2) if text == "word8" else b, text)
+                    for a, b, text in result]
+    audio = np.arange(200, dtype=np.int16)
+    words = [(i - .1, i + .1, f"word{i}") for i in range(1, 20)]
+    stream = StreamingDictation(None, JitterEngine(words), pipeline(), tmp_path)
+    stream._process(audio[:100], 10, 0, 8, budget=2)
+    stream._process(audio[65:180], 10, 6.5, 16, budget=2)
+    assert " ".join(text for _, _, text in stream._segments).split() == [f"word{i}" for i in range(1, 16)]
+
+
+def test_speech_resuming_after_silence_is_kept_despite_timestamp_jitter(tmp_path):
+    class ResumeEngine(TimedEngine):
+        def transcribe_words(self, path):
+            result = super().transcribe_words(path)
+            with wave.open(str(path)) as wav:
+                begin = np.frombuffer(wav.readframes(1), dtype=np.int16)[0] / wav.getframerate()
+            shift = .2 if begin == 0 else -.2
+            return [(a + shift if text == "resume" else a,
+                     b + shift if text == "resume" else b, text) for a, b, text in result]
+    audio = np.arange(600, dtype=np.int16)
+    engine = ResumeEngine([(1, 1.2, "before"), (23.9, 24.1, "resume"), (25, 25.2, "after")])
+    stream = StreamingDictation(None, engine, pipeline(), tmp_path)
+    stream._process(audio[:300], 10, 0, 24, budget=2)
+    stream._process(audio[180:540], 10, 18, 48, budget=2)
+    assert " ".join(text for _, _, text in stream._segments) == "before resume after"
+
+
+def test_final_window_failure_recovers_full_transcript(tmp_path):
+    engine = MagicMock()
+    engine.transcribe_words.side_effect = RuntimeError("alignment failed")
+    engine.transcribe_segments.return_value = [(0, 4, "all the original speech")]
+    stream = StreamingDictation(None, engine, pipeline(), tmp_path)
+    stream._thread = MagicMock()
+    stream._segments = [(0, 1, "partial prefix")]
+    stream._cursor = 1
+    path = tmp_path / "audio.wav"
+    write_audio(path, np.arange(40, dtype=np.int16))
+    segments, cleaned = stream.finish(path)
+    assert cleaned == "all the original speech"
+    assert segments == [(0, 4, "all the original speech")]

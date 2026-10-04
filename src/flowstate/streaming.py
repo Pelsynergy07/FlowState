@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import wave
 from pathlib import Path
@@ -26,6 +27,8 @@ class StreamingDictation:
         self._cursor = 0.0
         self._segments: list[tuple[float, float, str]] = []
         self._cleaned: list[str] = []
+        self._words: list[tuple[float, float, str]] = []
+        self._pending: list[tuple[float, float, str]] = []
         self._error: Exception | None = None
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -57,17 +60,51 @@ class StreamingDictation:
                 wav.setframerate(rate)
                 wav.writeframes(audio.tobytes())
             words = self._engine.transcribe_words(path)
-            # The same time interval is owned by exactly one window. Both
-            # sides hear context, but only its owned words enter the transcript.
-            owned = [(begin + start, begin + end, text) for start, end, text in words
-                     if self._cursor <= begin + (start + end) / 2
-                     and (final or begin + (start + end) / 2 < cutoff)]
+            candidates = [(begin + start, begin + end, text) for start, end, text in words]
+            start_index = None
+            if self._words and self._words[-1][1] >= begin:
+                # Timestamp estimates shift slightly between overlapping
+                # windows. Align their recognized overlap before choosing the
+                # new prefix; a clock-only cutoff can drop a boundary word in
+                # both windows or deliver it twice.
+                normalize = lambda word: "".join(re.findall(r"\w+", word.casefold()))
+                prior = [normalize(text) for _, _, text in self._words[-16:]]
+                current = [normalize(text) for _, _, text in candidates]
+                for size in range(len(prior), 0, -1):
+                    matches = [index for index in range(size, len(current) + 1)
+                               if current[index - size:index] == prior[-size:]
+                               and abs(candidates[index - 1][1] - self._words[-1][1]) <= 1.0]
+                    if matches:
+                        start_index = min(matches, key=lambda index: abs(candidates[index - 1][1] - self._words[-1][1]))
+                        break
+                if start_index is None:
+                    raise RuntimeError("Could not align live speech overlap; recovering complete recording")
+            if start_index is not None:
+                candidates = candidates[start_index:]
+            elif self._pending and abs((self._pending[0][0] + self._pending[0][1]) / 2 - self._cursor) <= 1.0:
+                # Speech resuming after a long silence can have no committed
+                # word in the overlap. Keep its previously seen first word
+                # even if its new time estimate moved before the cutoff.
+                token = "".join(re.findall(r"\w+", self._pending[0][2].casefold()))
+                matches = [index for index, word in enumerate(candidates)
+                           if "".join(re.findall(r"\w+", word[2].casefold())) == token
+                           and abs(word[1] - self._pending[0][1]) <= 1.0]
+                if not matches:
+                    raise RuntimeError("Could not align resumed speech; recovering complete recording")
+                candidates = candidates[min(matches, key=lambda index: abs(candidates[index][1] - self._pending[0][1])):]
+            elif self._cursor == 0:
+                pass
+            else:
+                candidates = [word for word in candidates if (word[0] + word[1]) / 2 >= self._cursor]
+            owned = [word for word in candidates if final or (word[0] + word[1]) / 2 < cutoff]
+            self._pending = [word for word in candidates if (word[0] + word[1]) / 2 >= cutoff] if not final else []
             raw = " ".join(text for _, _, text in owned)
             if raw:
                 cleaned = self._pipeline.run(raw, budget_seconds=budget, allow_load=False,
                                              cancel_event=None if final else self._stop)
                 self._segments.append((owned[0][0], owned[-1][1], raw))
                 self._cleaned.append(cleaned)
+                self._words.extend(owned)
             self._cursor = cutoff
         finally:
             path.unlink(missing_ok=True)
@@ -77,9 +114,7 @@ class StreamingDictation:
         self._thread.join()
         if self._error is not None:
             # Never deliver a partial prefix after any failed live window.
-            segments = self._engine.transcribe_segments(wav_path)
-            raw = " ".join(text for _, _, text in segments)
-            return segments, structure_text(self._pipeline.run(raw, budget_seconds=2.0, allow_load=False))
+            return self._recover(wav_path)
         with wave.open(str(wav_path), "rb") as wav:
             rate = wav.getframerate()
             duration = wav.getnframes() / rate
@@ -92,5 +127,14 @@ class StreamingDictation:
             budget = 2.0 if not self._segments else 0.8
             # Whisper can align its last word slightly beyond the WAV's end.
             # The final window must keep it rather than treat padding as a cutoff.
-            self._process(audio, rate, begin, duration, budget=budget, final=True)
+            try:
+                self._process(audio, rate, begin, duration, budget=budget, final=True)
+            except Exception:
+                logger.warning("Final live window failed; recovering complete recording", exc_info=True)
+                return self._recover(wav_path)
         return list(self._segments), structure_text(" ".join(self._cleaned))
+
+    def _recover(self, wav_path: Path) -> tuple[list[tuple[float, float, str]], str]:
+        segments = self._engine.transcribe_segments(wav_path)
+        raw = " ".join(text for _, _, text in segments)
+        return segments, structure_text(self._pipeline.run(raw, budget_seconds=0.8, allow_load=False))
