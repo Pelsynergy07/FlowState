@@ -177,6 +177,30 @@ class RecordingController:
     def start_recording(self, mode: str = "ptt") -> None:
         if self._recording or self._processing:
             return
+        try:
+            self._begin_recording(mode)
+        except Exception as exc:
+            self._recover_recording_error(exc)
+
+    def _recover_recording_error(self, exc: Exception) -> None:
+        """Device/file errors must not leave the HUD and hotkeys stuck busy."""
+        logger.error("Recording failed", exc_info=True)
+        if self._capture_hook is not None:
+            try:
+                self._capture_hook.stop()
+            except Exception:
+                logger.warning("Could not stop capture hook", exc_info=True)
+            self._capture_hook = None
+        self._recorder.abort_and_close()
+        self._recording = False
+        self._recording_mode = None
+        self._processing = False
+        self._current_session = None
+        self._current_hwnd = None
+        self._hotkeys.reset_active_mode()
+        self.signals.error.emit(str(exc))
+
+    def _begin_recording(self, mode: str) -> None:
         self._recording = True
         self._recording_mode = mode
         self._current_hwnd = get_foreground_window()
@@ -281,6 +305,12 @@ class RecordingController:
         return min(segments, key=distance)[2]
 
     def stop_recording(self) -> None:
+        try:
+            self._finish_recording()
+        except Exception as exc:
+            self._recover_recording_error(exc)
+
+    def _finish_recording(self) -> None:
         if not self._recording or self._current_session is None:
             return
         self._recording = False
@@ -328,6 +358,9 @@ class RecordingController:
         try:
             segments = self._asr.transcribe_segments(wav_path)
             raw_text = " ".join(text for _start, _end, text in segments)
+            # Keep the full ASR output available for recovery/debugging even if
+            # formatting or pasting fails. Startup history purging still applies.
+            (session.folder / "raw_transcript.txt").write_text(raw_text, encoding="utf-8")
             cleaned_text = self._pipeline.run(raw_text)
             logger.info("Transcribed: %r", cleaned_text)
 

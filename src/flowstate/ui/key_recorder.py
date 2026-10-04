@@ -44,6 +44,11 @@ def _format_token_badge(token: str) -> str:
     return mapping.get(token, token.upper())
 
 
+def format_hotkey_display(combo: str) -> str:
+    """Readable key names shared by the recorder and settings shortcut hint."""
+    return " + ".join(_format_token_badge(token.strip("<> ")) for token in combo.split("+") if token.strip("<> ")) or "Not set"
+
+
 class KeyRecorderWidget(QWidget):
     """Neo-Brutalist key combination recorder.
 
@@ -97,7 +102,7 @@ class KeyRecorderWidget(QWidget):
         # Status / prompt label (hidden when not recording)
         self._prompt_label = QLabel("[ PRESS ANY KEY COMBINATION... ]")
         self._prompt_label.setStyleSheet(
-            f"font-family: {FONT_FAMILY_MONO}; font-size: 11px; font-weight: 900; color: #FFFFFF;"
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 11px; font-weight: 700; color: #FFFFFF;"
         )
         self._prompt_label.setVisible(False)
         box_layout.addWidget(self._prompt_label, 1)
@@ -110,11 +115,11 @@ class KeyRecorderWidget(QWidget):
             QPushButton {{
                 background-color: #000000;
                 color: #FFFFFF;
-                border: 2px solid #000000;
-                border-radius: 0px;
+                border: 1px solid #1A1A1A;
+                border-radius: 3px;
                 font-family: {FONT_FAMILY_MONO};
                 font-size: 10px;
-                font-weight: 900;
+                font-weight: 700;
                 padding: 6px 12px;
             }}
             QPushButton:hover {{
@@ -132,8 +137,8 @@ class KeyRecorderWidget(QWidget):
             QPushButton {{
                 background-color: #FFFFFF;
                 color: #000000;
-                border: 2px solid #000000;
-                border-radius: 0px;
+                border: 1px solid #1A1A1A;
+                border-radius: 3px;
                 font-family: {FONT_FAMILY_MONO};
                 font-size: 10px;
                 font-weight: 800;
@@ -157,8 +162,8 @@ class KeyRecorderWidget(QWidget):
                 """
                 #keyRecorderBox {
                     background-color: #000000;
-                    border: 2px solid #000000;
-                    border-radius: 0px;
+                    border: 1px solid #1A1A1A;
+                    border-radius: 3px;
                 }
                 """
             )
@@ -173,7 +178,7 @@ class KeyRecorderWidget(QWidget):
                     border: 2px solid #FFFFFF;
                     font-family: {FONT_FAMILY_MONO};
                     font-size: 10px;
-                    font-weight: 900;
+                    font-weight: 700;
                     padding: 6px 12px;
                 }}
                 """
@@ -183,11 +188,11 @@ class KeyRecorderWidget(QWidget):
                 """
                 #keyRecorderBox {
                     background-color: #FFFFFF;
-                    border: 2px solid #000000;
-                    border-radius: 0px;
+                    border: 1px solid #1A1A1A;
+                    border-radius: 3px;
                 }
                 #keyRecorderBox:hover {
-                    background-color: #FAFAFA;
+                    background-color: #F6F2EC;
                 }
                 """
             )
@@ -199,10 +204,10 @@ class KeyRecorderWidget(QWidget):
                 QPushButton {{
                     background-color: #000000;
                     color: #FFFFFF;
-                    border: 2px solid #000000;
+                    border: 1px solid #1A1A1A;
                     font-family: {FONT_FAMILY_MONO};
                     font-size: 10px;
-                    font-weight: 900;
+                    font-weight: 700;
                     padding: 6px 12px;
                 }}
                 QPushButton:hover {{
@@ -233,20 +238,20 @@ class KeyRecorderWidget(QWidget):
             if i > 0:
                 plus_lbl = QLabel("+")
                 plus_lbl.setStyleSheet(
-                    f"font-family: {FONT_FAMILY_MONO}; font-size: 12px; font-weight: 900; color: #000000;"
+                    f"font-family: {FONT_FAMILY_MONO}; font-size: 12px; font-weight: 700; color: #000000;"
                 )
                 self._chips_layout.addWidget(plus_lbl)
 
             badge = QLabel(_format_token_badge(token))
             badge.setStyleSheet(
                 f"""
-                background-color: #F0F0F0;
+                background-color: #F6F2EC;
                 color: #000000;
-                border: 2px solid #000000;
-                border-radius: 0px;
+                border: 1px solid #1A1A1A;
+                border-radius: 3px;
                 font-family: {FONT_FAMILY_MONO};
                 font-size: 11px;
-                font-weight: 900;
+                font-weight: 700;
                 padding: 4px 10px;
                 """
             )

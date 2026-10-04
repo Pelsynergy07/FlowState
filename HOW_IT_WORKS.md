@@ -57,7 +57,8 @@ Everything lives under `%LOCALAPPDATA%\FlowState`:
 
 - `models\` -- the downloaded AI models.
 - `sessions\` -- one folder per recording: the transcript and any
-  screenshots. Kept for a while, then pruned automatically.
+  screenshots, plus the complete raw transcript for recovery. History is cleared
+  when FlowState starts; a 7-day / 500 MB limit also applies during use.
 - `config.json` -- your settings (shortcuts, microphone, capture mode,
   etc).
 - `logs\flowstate.log` -- a rotating log file, the main way to debug
@@ -80,6 +81,6 @@ passes through untouched.
 
 FlowState puts the cleaned-up text on your clipboard and simulates
 Ctrl+V into whichever window had focus when you started recording, then
-restores your previous clipboard contents afterward. If you captured
+restores your previous clipboard text and images afterward. If you captured
 screenshots, each one gets pasted the same way, right after the text, so
 everything lands in one place without you doing anything extra.

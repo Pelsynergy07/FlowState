@@ -257,7 +257,7 @@ class OnboardingDialog(QDialog):
         eyebrow_row = QHBoxLayout()
         eyebrow_row.setSpacing(6)
         eyebrow_star = GeometricMotif("star", size=11, color=INK)
-        eyebrow = QLabel("SYS.01 // GETTING STARTED")
+        eyebrow = QLabel("FLOWSTATE / GETTING STARTED")
         eyebrow.setProperty("role", "eyebrow")
         eyebrow_row.addWidget(eyebrow_star)
         eyebrow_row.addWidget(eyebrow)
@@ -280,7 +280,7 @@ class OnboardingDialog(QDialog):
         hw_card.setProperty("role", "card")
         hw_layout = QHBoxLayout(hw_card)
         hw_layout.setContentsMargins(16, 12, 16, 12)
-        hw_icon = QLabel("⚡")
+        hw_icon = GeometricMotif("star", size=22)
         hw_icon.setFont(make_font(FONT_FAMILY, 16))
         hw_texts = QVBoxLayout()
         hw_texts.setSpacing(2)
@@ -312,9 +312,9 @@ class OnboardingDialog(QDialog):
 
         mic_head = QHBoxLayout()
         mic_head.setSpacing(8)
-        mic_icon = QLabel("🎙️")
+        mic_icon = GeometricMotif("dot_grid", size=18)
         mic_icon.setFont(make_font(FONT_FAMILY, 14))
-        mic_lbl = QLabel("AUDIO INPUT (MICROPHONE)")
+        mic_lbl = QLabel("YOUR MICROPHONE")
         mic_lbl.setFont(make_font(FONT_FAMILY_MONO, 8.5, bold=True))
         mic_head.addWidget(mic_icon)
         mic_head.addWidget(mic_lbl)
@@ -421,7 +421,6 @@ class OnboardingDialog(QDialog):
 
         # 5. Action Buttons with Skip Option pinned at bottom
         btn_bar = QWidget()
-        btn_bar.setStyleSheet("background: transparent;")
         btn_row = QHBoxLayout(btn_bar)
         btn_row.setContentsMargins(0, 4, 0, 0)
         btn_row.setSpacing(10)
@@ -434,14 +433,9 @@ class OnboardingDialog(QDialog):
         self.skip_btn.clicked.connect(self._skip_onboarding)
         btn_row.addWidget(self.skip_btn)
 
-        self.start_btn = QPushButton("Get Started →")
+        self.start_btn = QPushButton("Prepare FlowState →")
         self.start_btn.setFixedHeight(44)
         self.start_btn.setProperty("role", "primary")
-        self.start_btn.setStyleSheet(
-            "background-color: #1A1A1A; color: #FFFFFF; border: 2px solid #1A1A1A; "
-            "border-right: 3.5px solid #000000; border-bottom: 3.5px solid #000000; "
-            "border-radius: 6px; padding: 6px 18px; font-family: 'Syne'; font-weight: 700; font-size: 12px;"
-        )
         self.start_btn.setCursor(Qt.PointingHandCursor)
         self.start_btn.clicked.connect(self._start_setup)
         btn_row.addWidget(self.start_btn, 1)

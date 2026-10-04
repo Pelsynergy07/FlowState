@@ -1,12 +1,7 @@
-"""The recording HUD: tactical neo-brutalist floating bar.
+"""Compact paper-and-ink recording status with a live meter and processing timer.
 
-Features:
-- Compact, non-occluding 236px width
-- 2px ink border with hard brutalist offset shadow
-- Pulsing Signal Lime diamond recording emblem
-- 5-bar live LED soundbar with peak gradient colors
-- Instrument Serif timer counter
-- Excluded from capture (WDA_EXCLUDEFROMCAPTURE) and never steals focus (WS_EX_NOACTIVATE)
+The non-activating window remains excluded from screen capture. Every state
+uses the website's diamond emblem, lime accent, and editorial timer type.
 """
 
 from __future__ import annotations
@@ -38,7 +33,7 @@ _WDA_EXCLUDEFROMCAPTURE = 0x00000011
 _WS_EX_NOACTIVATE = 0x08000000
 _GWL_EXSTYLE = -20
 
-_BAR_COUNT = 5
+_BAR_COUNT = 7
 _METER_UPDATE_MS = 45
 
 
@@ -67,6 +62,7 @@ class RecordingHUD(QWidget):
         self._state = "idle"  # "idle" | "recording" | "processing"
         self._native_flags_applied = False
         self._phase = 0.0
+        self._processing_started: float | None = None
 
         self.setWindowFlags(
             Qt.FramelessWindowHint
@@ -77,10 +73,13 @@ class RecordingHUD(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         # Compact width & height with uniform margins
-        self.resize(176, 46)
+        self.resize(286, 66)
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
+        self._notice_timer = QTimer(self)
+        self._notice_timer.setSingleShot(True)
+        self._notice_timer.timeout.connect(self.hide_recording)
 
     def _apply_native_window_flags(self) -> None:
         hwnd = int(self.winId())
@@ -99,6 +98,8 @@ class RecordingHUD(QWidget):
         self.move(x, y)
 
     def show_recording(self) -> None:
+        self._notice_timer.stop()
+        self.resize(286, 66)
         self._state = "recording"
         self._start_time = time.monotonic()
         self._level_history = [0.0] * _BAR_COUNT
@@ -111,12 +112,16 @@ class RecordingHUD(QWidget):
         self._timer.start(_METER_UPDATE_MS)
 
     def show_processing(self) -> None:
+        self._notice_timer.stop()
+        self.resize(286, 66)
+        self._processing_started = time.monotonic()
         self._state = "processing"
         if not self._timer.isActive():
             self._timer.start(_METER_UPDATE_MS)
         self.update()
 
     def show_notice(self, message: str = "No speech detected (check mic)", duration_ms: int = 2500) -> None:
+        self.resize(380, 66)
         self._state = "notice"
         self._notice_message = message
         self._timer.stop()
@@ -126,10 +131,11 @@ class RecordingHUD(QWidget):
             self._apply_native_window_flags()
             self._native_flags_applied = True
         self.update()
-        QTimer.singleShot(duration_ms, self.hide_recording)
+        self._notice_timer.start(duration_ms)
 
     def hide_recording(self) -> None:
         self._state = "idle"
+        self._notice_timer.stop()
         self._timer.stop()
         self.hide()
 
@@ -149,97 +155,53 @@ class RecordingHUD(QWidget):
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-
-        # Allow 4px margin for hard shadow
-        w = self.width() - 5
-        h = self.height() - 5
-        bar_rect = QRectF(1.5, 1.5, w, h)
-        shadow_rect = QRectF(5, 5, w, h)
-
-        # 1. Hard Brutalist Shadow
+        w, h = self.width() - 6, self.height() - 6
+        surface = QRectF(1, 1, w, h)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(BORDER))
-        painter.drawRoundedRect(shadow_rect, 4, 4)
-
-        # 2. Solid Surface & Border
-        painter.setPen(QPen(QColor(BORDER), 2.2))
+        painter.setBrush(QColor(INK))
+        painter.drawRoundedRect(QRectF(5, 5, w, h), 5, 5)
+        painter.setPen(QPen(QColor(INK), 1.5))
         painter.setBrush(QColor(PAPER_RAISED))
-        painter.drawRoundedRect(bar_rect, 4, 4)
+        painter.drawRoundedRect(surface, 5, 5)
 
-        cy = h / 2.0 + 1.5
+        # The site's diamond mark anchors every recording state.
+        cy = h / 2 + 1
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(LIME if self._state != "notice" else "#EFE8DC"))
+        painter.drawRoundedRect(QRectF(11, 11, 39, 39), 4, 4)
+        painter.save()
+        painter.translate(30.5, cy)
+        if self._state == "processing":
+            painter.rotate((self._phase * 30) % 360)
+        _draw_diamond_emblem(painter, 0, 0, 10 + 0.5 * math.sin(self._phase), QColor(INK))
+        painter.setBrush(QColor(PAPER_RAISED))
+        painter.drawEllipse(QPointF(0, 0), 1.8, 1.8)
+        painter.restore()
 
         if self._state == "recording":
-            # 1. Gentle pulsing Signal Lime diamond emblem (slower cadence)
-            cx = 20.0
-            pulse_r = 7.0 + 0.9 * math.sin(self._phase * 1.5)
-            _draw_diamond_emblem(painter, cx, cy, pulse_r, QColor(LIME))
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(INK))
-            painter.drawEllipse(QPointF(cx, cy), 1.8, 1.8)
-
-            # 2. Live 5-bar LED waveform
-            bars_start_x = 35.0
-            bar_w = 3.2
-            gap = 2.4
-            max_bar_h = 20.0
-            for i, lvl in enumerate(self._level_history):
-                bh = max(3.0, lvl * max_bar_h)
-                bx = bars_start_x + i * (bar_w + gap)
-                by = cy - bh / 2.0
-                b_rect = QRectF(bx, by, bar_w, bh)
-                if i >= 3 and lvl > 0.75:
-                    painter.setBrush(QColor(ORANGE))
-                else:
-                    painter.setBrush(QColor(INK))
-                painter.drawRect(b_rect)
-
-            # 3. Clean Instrument Serif timer (vertically centered, balanced right margin)
-            elapsed = time.monotonic() - self._start_time if self._start_time else 0.0
-            mins, secs = divmod(int(elapsed), 60)
-            tenths = int((elapsed - int(elapsed)) * 10)
-
-            text_x = 73.0
-            painter.setPen(QColor(INK))
-            painter.setFont(make_font(FONT_FAMILY_DISPLAY, 21))
-            painter.drawText(QRectF(text_x, 2, 58, h), Qt.AlignLeft | Qt.AlignVCenter, f"{mins:02d}:{secs:02d}")
-
-            # Sub-second decimal in Space Mono
             painter.setPen(QColor(MUTED_TEXT))
-            painter.setFont(make_font(FONT_FAMILY_MONO, 8))
-            painter.drawText(QRectF(text_x + 55, 4, 30, h), Qt.AlignLeft | Qt.AlignVCenter, f".{tenths}")
-
+            painter.setFont(make_font(FONT_FAMILY_MONO, 7, bold=True))
+            painter.drawText(QRectF(64, 10, 100, 17), Qt.AlignVCenter, "LISTENING")
+            painter.setPen(Qt.NoPen)
+            for i, level in enumerate(self._level_history):
+                bar_h = max(3, level * 18)
+                painter.setBrush(QColor(INK))
+                painter.drawRoundedRect(QRectF(65 + i * 8, 39 - bar_h / 2, 4, bar_h), 1, 1)
+            elapsed = time.monotonic() - self._start_time if self._start_time else 0
+            minutes, seconds = divmod(int(elapsed), 60)
+            painter.setPen(QColor(INK))
+            painter.setFont(make_font(FONT_FAMILY_DISPLAY, 27))
+            painter.drawText(QRectF(164, 5, 100, 47), Qt.AlignRight | Qt.AlignVCenter, f"{minutes:02d}:{seconds:02d}")
         elif self._state == "processing":
-            # 1. Lively spinning diamond sparkle emblem with Signal Lime pulsing core
-            cx = 22.0
-            painter.save()
-            painter.translate(cx, cy)
-            angle = (self._phase * 40.0) % 360.0
-            painter.rotate(angle)
-            _draw_diamond_emblem(painter, 0, 0, 7.8, QColor(INK))
-            painter.setPen(Qt.NoPen)
-            core_r = 1.8 + 0.6 * math.sin(self._phase * 2.5)
-            painter.setBrush(QColor(LIME))
-            painter.drawEllipse(QPointF(0, 0), core_r, core_r)
-            painter.restore()
-
-            # 2. Human-like "Polishing..." text with dynamic animated ellipsis
-            dots = "." * (int(self._phase * 1.5) % 3 + 1)
-            display_text = f"Polishing{dots}"
-
             painter.setPen(QColor(INK))
-            painter.setFont(make_font(FONT_FAMILY_DISPLAY, 18, italic=True))
-            painter.drawText(QRectF(40, 2, w - 44, h), Qt.AlignLeft | Qt.AlignVCenter, display_text)
-
-
+            painter.setFont(make_font(FONT_FAMILY_DISPLAY, 17))
+            painter.drawText(QRectF(64, 7, w - 75, 27), Qt.AlignVCenter, "Processing your words…")
+            painter.setPen(QColor(MUTED_TEXT))
+            painter.setFont(make_font(FONT_FAMILY_MONO, 7))
+            elapsed = int(time.monotonic() - self._processing_started) if self._processing_started else 0
+            painter.drawText(QRectF(65, 34, w - 76, 18), Qt.AlignVCenter, f"TRANSCRIBING + POLISHING   {elapsed}s")
         elif self._state == "notice":
-            cx = 20.0
-            _draw_diamond_emblem(painter, cx, cy, 7.0, QColor(ORANGE))
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(PAPER_RAISED))
-            painter.drawEllipse(QPointF(cx, cy), 1.8, 1.8)
-
             painter.setPen(QColor(INK))
-            painter.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
-            msg = getattr(self, "_notice_message", "No speech detected")
-            painter.drawText(QRectF(34, 2, w - 38, h), Qt.AlignLeft | Qt.AlignVCenter, msg)
-
+            painter.setFont(make_font(FONT_FAMILY_MONO, 8))
+            painter.drawText(QRectF(64, 9, w - 76, h - 16), Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, getattr(self, "_notice_message", "No speech detected"))
+        painter.end()

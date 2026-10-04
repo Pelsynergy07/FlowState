@@ -29,7 +29,7 @@ def test_tutorial_dialog_initialization(qapp):
     dlg = TutorialDialog(controller)
     assert dlg.stack.count() == 2
     assert dlg.stack.currentIndex() == 0
-    assert dlg.step_badge.text == "✦ STEP 01 / 02"
+    assert dlg.step_badge.text == "STEP 01 / 02"
     dlg.close()
 
 
@@ -44,14 +44,14 @@ def test_tutorial_dialog_step_navigation(qapp):
     # Move to Step 2
     dlg._go_next()
     assert dlg.stack.currentIndex() == 1
-    assert dlg.step_badge.text == "✦ STEP 02 / 02"
+    assert dlg.step_badge.text == "STEP 02 / 02"
     assert not dlg.prev_btn.isHidden()
     assert dlg.next_btn.text() == "Open FlowState →"
 
     # Move back to Step 1
     dlg._go_prev()
     assert dlg.stack.currentIndex() == 0
-    assert dlg.step_badge.text == "✦ STEP 01 / 02"
+    assert dlg.step_badge.text == "STEP 01 / 02"
 
     dlg.close()
 

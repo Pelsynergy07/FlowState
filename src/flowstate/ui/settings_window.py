@@ -42,8 +42,8 @@ from ..update_check import UpdateInfo
 from .autostart import set_launch_at_login
 from .fonts import make_font
 from .key_recorder import KeyRecorderWidget
-from .theme import FONT_FAMILY, FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background, setup_brutalist_combobox
-from .widgets import BrutalistCheckBox, StickerBadge
+from .theme import FONT_FAMILY, FONT_FAMILY_DISPLAY, FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background, setup_brutalist_combobox
+from .widgets import BrutalistCheckBox, StickerBadge, GeometricMotif
 
 
 def _eyebrow(text: str) -> QLabel:
@@ -76,8 +76,8 @@ def _card(*widgets: QWidget) -> QFrame:
     frame = QFrame()
     frame.setProperty("role", "card")
     layout = QVBoxLayout(frame)
-    layout.setContentsMargins(20, 14, 20, 14)
-    layout.setSpacing(8)
+    layout.setContentsMargins(22, 18, 22, 18)
+    layout.setSpacing(12)
     for w in widgets:
         layout.addWidget(w)
     return frame
@@ -104,21 +104,26 @@ class SettingsWindow(QDialog):
         self._update_info = update_info
         self.setWindowTitle("FlowState Settings")
         self.setStyleSheet(build_stylesheet())
-        self.resize(780, 680)
-        self.setMinimumSize(740, 600)
+        self.resize(920, 760)
+        self.setMinimumSize(780, 620)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(30, 26, 30, 22)
+        outer.setContentsMargins(34, 22, 34, 22)
         outer.setSpacing(14)
 
         # Header with metadata version tag and dynamic update action
         header_row = QHBoxLayout()
 
-        header_title_col = QVBoxLayout()
-        header_title_col.setSpacing(4)
-        header_title_col.addWidget(_eyebrow("SYS.01 // FLOWSTATE CONFIGURATION"))
-        header_title_col.addWidget(_headline("Settings"))
-        header_row.addLayout(header_title_col, 1)
+        brand_row = QHBoxLayout()
+        brand_row.setSpacing(10)
+        brand_row.addWidget(GeometricMotif("star", size=22))
+        wordmark = QLabel("FlowState")
+        wordmark.setProperty("role", "wordmark")
+        brand_row.addWidget(wordmark)
+        brand_row.addSpacing(16)
+        brand_row.addWidget(_eyebrow("YOUR VOICE. YOUR MACHINE."))
+        brand_row.addStretch(1)
+        header_row.addLayout(brand_row, 1)
 
         badge_row = QHBoxLayout()
         badge_row.setSpacing(8)
@@ -156,22 +161,64 @@ class SettingsWindow(QDialog):
         outer.addLayout(header_row)
         outer.addWidget(_rule())
 
+        intro_row = QHBoxLayout()
+        intro_row.setSpacing(24)
+        intro = QVBoxLayout()
+        intro.setSpacing(5)
+        self._page_headline = _headline("Make it yours.")
+        intro.addWidget(self._page_headline)
+        intro_row.addLayout(intro, 1)
+
+        shortcut_panel = QFrame()
+        shortcut_panel.setProperty("role", "shortcut-panel")
+        shortcut_layout = QVBoxLayout(shortcut_panel)
+        shortcut_layout.setContentsMargins(18, 12, 18, 12)
+        shortcut_layout.setSpacing(6)
+        shortcut_layout.addWidget(_eyebrow("HOLD TO TALK"))
+        from .key_recorder import format_hotkey_display
+        # The same configured binding shown in the shortcut editor.
+        binding = self.config_store.config.shortcuts.push_to_talk
+        self._shortcut_hint = QLabel(format_hotkey_display(binding))
+        self._shortcut_hint.setProperty("role", "key-hint")
+        self._shortcut_hint.setAlignment(Qt.AlignCenter)
+        shortcut_layout.addWidget(self._shortcut_hint)
+        shortcut_layout.addWidget(_muted("Release to paste anywhere."))
+        intro_row.addWidget(shortcut_panel)
+        outer.addLayout(intro_row)
+        outer.addSpacing(5)
+
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_general_tab(), "GENERAL")
-        self.tabs.addTab(self._build_shortcuts_tab(), "SHORTCUTS")
-        self.tabs.addTab(self._build_model_tab(), "MODEL")
-        self.tabs.addTab(self._build_cleanup_tab(), "CLEANUP")
-        self.tabs.addTab(self._build_capture_tab(), "CAPTURE")
-        self.tabs.addTab(self._build_history_tab(), "HISTORY")
-        self.tabs.addTab(self._build_about_tab(), "ABOUT")
+        self.tabs.setDocumentMode(True)
+        for build, title in (
+            (self._build_general_tab, "General"),
+            (self._build_shortcuts_tab, "Shortcuts"),
+            (self._build_model_tab, "Model"),
+            (self._build_cleanup_tab, "Cleanup"),
+            (self._build_capture_tab, "Capture"),
+            (self._build_history_tab, "History"),
+            (self._build_about_tab, "About"),
+        ):
+            page = build()
+            if title != "History":
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                scroll.setFrameShape(QFrame.NoFrame)
+                scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                scroll.setWidget(page)
+                page = scroll
+            self.tabs.addTab(page, title)
         outer.addWidget(self.tabs, 1)
+        outer.addWidget(_rule())
 
         button_row = QHBoxLayout()
+        button_row.addWidget(_eyebrow("PRIVATE. LOCAL. YOURS."))
         button_row.addStretch(1)
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setProperty("role", "secondary")
         cancel_btn.clicked.connect(self.reject)
-        save_btn = QPushButton("Save Changes")
+        save_btn = QPushButton("Save changes  →")
+        save_btn.setProperty("role", "primary")
+        save_btn.setDefault(True)
         save_btn.clicked.connect(self._save)
         button_row.addWidget(cancel_btn)
         button_row.addWidget(save_btn)
@@ -231,11 +278,11 @@ class SettingsWindow(QDialog):
         self._initial_mic = cfg.microphone_device
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(18)
 
         self.mic_combo = QComboBox()
-        self.mic_combo.setFixedHeight(36)
+        self.mic_combo.setFixedHeight(40)
         setup_brutalist_combobox(self.mic_combo)
         self.mic_combo.addItem("System default", None)
         for d in list_input_devices():
@@ -248,23 +295,23 @@ class SettingsWindow(QDialog):
         mic_meta_row = QHBoxLayout(mic_meta_widget)
         mic_meta_row.setContentsMargins(0, 0, 0, 0)
         mic_meta_row.setSpacing(8)
-        self.mic_status_lbl = QLabel("✓ Live audio stream connected")
+        self.mic_status_lbl = QLabel("Uses your selected Windows audio input")
         self.mic_status_lbl.setProperty("role", "mono")
-        self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
+        self.mic_status_lbl.setProperty("role", "muted")
         mic_meta_row.addWidget(self.mic_status_lbl, 1)
 
-        self._mic_restart_btn = QPushButton("↺ RESTART TO RESET AUDIO")
+        self._mic_restart_btn = QPushButton("Restart to reset audio")
         self._mic_restart_btn.setProperty("role", "secondary")
         self._mic_restart_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; padding: 4px 10px;")
         self._mic_restart_btn.clicked.connect(self._restart_app)
         self._mic_restart_btn.hide()
         mic_meta_row.addWidget(self._mic_restart_btn)
 
-        layout.addWidget(_card(_eyebrow("01 / Microphone"), self.mic_combo, mic_meta_widget))
+        layout.addWidget(_card(_eyebrow("Microphone"), self.mic_combo, mic_meta_widget))
 
         self.launch_at_login = BrutalistCheckBox("Launch FlowState automatically when Windows starts", checked=cfg.launch_at_login)
-        self.sound_cues = BrutalistCheckBox("Play acoustic sound cue when recording starts/stops", checked=cfg.sound_cues)
-        layout.addWidget(_card(_eyebrow("02 / Behavior"), self.launch_at_login, self.sound_cues))
+        self.sound_cues = BrutalistCheckBox("Play a sound when recording starts and stops", checked=cfg.sound_cues)
+        layout.addWidget(_card(_eyebrow("Everyday behavior"), self.launch_at_login, self.sound_cues))
 
         layout.addStretch(1)
         return page
@@ -283,8 +330,8 @@ class SettingsWindow(QDialog):
             self.mic_status_lbl.setStyleSheet("color: #b05a00; font-weight: 700; font-size: 11px;")
         else:
             self._mic_restart_btn.hide()
-            self.mic_status_lbl.setText("✓ Live audio stream connected")
-            self.mic_status_lbl.setStyleSheet("color: #1a7f37; font-weight: 700; font-size: 11px;")
+            self.mic_status_lbl.setText("Uses your selected Windows audio input")
+            self.mic_status_lbl.setProperty("role", "muted")
 
 
     # -- Shortcuts --------------------------------------------------------
@@ -292,7 +339,7 @@ class SettingsWindow(QDialog):
         cfg = self.config_store.config.shortcuts
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(12)
 
         header_row = QHBoxLayout()
@@ -300,7 +347,7 @@ class SettingsWindow(QDialog):
             _muted("Click any box or press RECORD, then tap your keyboard shortcut.")
         )
         header_row.addStretch(1)
-        reset_btn = QPushButton("↺ Reset to Defaults")
+        reset_btn = QPushButton("Reset to defaults")
         reset_btn.setProperty("role", "secondary")
         reset_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; padding: 4px 10px;")
         reset_btn.clicked.connect(self._reset_shortcuts)
@@ -310,7 +357,7 @@ class SettingsWindow(QDialog):
         self.toggle_edit = KeyRecorderWidget(cfg.toggle)
         layout.addWidget(
             _card(
-                _eyebrow("03 / Toggle Shortcut (Hands-Free)"),
+                _eyebrow("Hands-free dictation"),
                 self.toggle_edit,
                 _muted("Press once to start dictation, press again to stop and paste transcription."),
             )
@@ -319,7 +366,7 @@ class SettingsWindow(QDialog):
         self.ptt_edit = KeyRecorderWidget(cfg.push_to_talk)
         layout.addWidget(
             _card(
-                _eyebrow("04 / Push-to-Talk Shortcut"),
+                _eyebrow("Push to talk"),
                 self.ptt_edit,
                 _muted("Hold while speaking. Release key to transcribe and paste immediately."),
             )
@@ -339,17 +386,17 @@ class SettingsWindow(QDialog):
         cfg = self.config_store.config.model
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(18)
 
         self.device_combo = QComboBox()
-        self.device_combo.setFixedHeight(36)
+        self.device_combo.setFixedHeight(40)
         setup_brutalist_combobox(self.device_combo)
         self.device_combo.addItems(["auto", "cuda", "cpu"])
         self.device_combo.setCurrentText(cfg.compute_device)
         layout.addWidget(
             _card(
-                _eyebrow("05 / Compute Device"),
+                _eyebrow("Speech recognition device"),
                 self.device_combo,
                 _muted("Auto uses your GPU when available and falls back to CPU automatically."),
                 self._build_device_status_label(),
@@ -383,18 +430,18 @@ class SettingsWindow(QDialog):
         cfg = self.config_store.config.cleanup
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(18)
 
         self.vocab_check = BrutalistCheckBox(
-            "Vocabulary correction (fixes domain terms, acronyms, and product names)",
+            "Correct vocabulary, acronyms, and product names",
             checked=cfg.vocabulary_enabled,
         )
         self.grammar_check = BrutalistCheckBox(
-            "Grammar & punctuation polish (removes verbal fillers and stammers)",
+            "Polish grammar and punctuation; remove fillers and stammers",
             checked=cfg.grammar_enabled,
         )
-        layout.addWidget(_card(_eyebrow("06 / Transcript Polish"), self.vocab_check, self.grammar_check))
+        layout.addWidget(_card(_eyebrow("Text cleanup"), self.vocab_check, self.grammar_check))
 
         layout.addStretch(1)
         return page
@@ -404,11 +451,11 @@ class SettingsWindow(QDialog):
         cfg = self.config_store.config.capture
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 24, 26, 24)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(18)
 
         self.capture_mode = QComboBox()
-        self.capture_mode.setFixedHeight(36)
+        self.capture_mode.setFixedHeight(40)
         setup_brutalist_combobox(self.capture_mode)
         self.capture_mode.addItem("Hold Ctrl and drag", "drag")
         self.capture_mode.addItem("Click to draw circle", "circle")
@@ -416,7 +463,7 @@ class SettingsWindow(QDialog):
         idx = self.capture_mode.findData(cfg.mode)
         self.capture_mode.setCurrentIndex(idx if idx >= 0 else 0)
         layout.addWidget(_card(
-            _eyebrow("07 / Visual Context Highlighting"),
+            _eyebrow("Screen capture gesture"),
             self.capture_mode,
             _muted("Capture screen context alongside audio to clarify code, ambiguous references, and diagrams."),
         ))
@@ -438,20 +485,20 @@ class SettingsWindow(QDialog):
     def _build_history_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(26, 20, 26, 20)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(12)
 
         # Header action bar
         top_bar = QHBoxLayout()
         header_text = QVBoxLayout()
         header_text.setSpacing(4)
-        header_text.addWidget(_eyebrow("08 / Session History & Clipboard"))
+        header_text.addWidget(_eyebrow("Current session"))
 
         # Brutalist callout chips
         chip_row = QHBoxLayout()
         chip_row.setSpacing(8)
-        chip_purge = StickerBadge("✦ AUTO-PURGED ON RESTART", bg_color="#FFFFFF", text_color="#000000", is_pill=False)
-        chip_copy = StickerBadge("1-CLICK CLIPBOARD COPY", bg_color="#000000", text_color="#FFFFFF", is_pill=False)
+        chip_purge = StickerBadge("CLEARS ON RESTART", bg_color="#FFFFFF", text_color="#000000", is_pill=False)
+        chip_copy = StickerBadge("LOCAL HISTORY", bg_color="#000000", text_color="#FFFFFF", is_pill=False)
         chip_row.addWidget(chip_purge)
         chip_row.addWidget(chip_copy)
         chip_row.addStretch(1)
@@ -459,7 +506,7 @@ class SettingsWindow(QDialog):
 
         top_bar.addLayout(header_text, 1)
 
-        purge_btn = QPushButton("PURGE ALL")
+        purge_btn = QPushButton("Clear history")
         purge_btn.setProperty("role", "secondary")
         purge_btn.setStyleSheet(
             f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 6px 12px;"
@@ -467,7 +514,7 @@ class SettingsWindow(QDialog):
         purge_btn.clicked.connect(self._purge_history)
         top_bar.addWidget(purge_btn)
 
-        open_folder_btn = QPushButton("OPEN FOLDER")
+        open_folder_btn = QPushButton("Open folder")
         open_folder_btn.setProperty("role", "secondary")
         open_folder_btn.setStyleSheet(
             f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 6px 12px;"
@@ -485,15 +532,14 @@ class SettingsWindow(QDialog):
             """
             QScrollArea {
                 background: transparent;
-                border: 2px solid #000000;
-                border-radius: 0px;
+                border: none;
             }
             """
         )
 
         self._history_content = QWidget()
         self._history_layout = QVBoxLayout(self._history_content)
-        self._history_layout.setContentsMargins(12, 12, 12, 12)
+        self._history_layout.setContentsMargins(0, 8, 8, 8)
         self._history_layout.setSpacing(12)
 
         self._history_scroll.setWidget(self._history_content)
@@ -518,26 +564,31 @@ class SettingsWindow(QDialog):
         sessions = list_sessions()[:30]
         if not sessions:
             empty_card = QFrame()
+            empty_card.setObjectName("historyEmpty")
             empty_card.setStyleSheet(
                 """
-                QFrame {
+                QFrame#historyEmpty {
                     background-color: #FFFFFF;
-                    border: 2px dashed #000000;
+                    border: 1px dashed #B7B0A4;
                     border-radius: 0px;
-                    padding: 30px;
+                    padding: 12px;
                 }
                 """
             )
             empty_layout = QVBoxLayout(empty_card)
             empty_layout.setAlignment(Qt.AlignCenter)
-            empty_title = QLabel("[ NO ACTIVE SESSIONS IN CURRENT RUN ]")
+            empty_title = QLabel("Your next thought starts here.")
             empty_title.setStyleSheet(
-                f"font-family: {FONT_FAMILY_MONO}; font-size: 13px; font-weight: 900; color: #000000;"
+                f"font-family: {FONT_FAMILY_DISPLAY}; font-size: 34px; font-weight: 400; color: #1A1A1A;"
             )
-            empty_subtitle = QLabel("Transcriptions recorded during this run will appear here with 1-click copy.")
+            empty_subtitle = QLabel("Speak with your dictation shortcut. Your transcripts will appear here, ready to copy.")
             empty_subtitle.setStyleSheet(
-                "font-size: 11px; color: #666666; margin-top: 4px;"
+                "font-size: 13px; color: #5C5751; margin-top: 8px;"
             )
+            empty_title.setAlignment(Qt.AlignCenter)
+            empty_subtitle.setWordWrap(True)
+            empty_subtitle.setAlignment(Qt.AlignCenter)
+            empty_card.setMinimumHeight(190)
             empty_layout.addWidget(empty_title)
             empty_layout.addWidget(empty_subtitle)
             self._history_layout.addWidget(empty_card)
@@ -551,11 +602,12 @@ class SettingsWindow(QDialog):
                 transcript = "(No transcription recorded)"
 
             card = QFrame()
+            card.setObjectName("historyEntry")
             card.setStyleSheet(
                 """
-                QFrame {
+                QFrame#historyEntry {
                     background-color: #FFFFFF;
-                    border: 2px solid #000000;
+                    border: 1px solid #D8D2C6;
                     border-radius: 0px;
                 }
                 """
@@ -686,9 +738,8 @@ class SettingsWindow(QDialog):
     # -- About --------------------------------------------------------
     def _build_about_tab(self) -> QWidget:
         page = QWidget()
-        page.setStyleSheet("background: transparent;")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 14, 24, 14)
+        layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(12)
 
         # 1. System Capabilities & Overview Card (Clean 2x2 grid without bulky subtext)
@@ -698,7 +749,7 @@ class SettingsWindow(QDialog):
         about_layout.setContentsMargins(18, 12, 18, 12)
         about_layout.setSpacing(8)
 
-        about_layout.addWidget(_eyebrow("09 / SYSTEM OVERVIEW & CORE CAPABILITIES"))
+        about_layout.addWidget(_eyebrow("Made to stay with you"))
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(16)
@@ -718,15 +769,15 @@ class SettingsWindow(QDialog):
                 "border-radius: 3px; font-size: 12px;"
             )
             t_lbl = QLabel(title)
-            t_lbl.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 800; color: #000000;")
+            t_lbl.setStyleSheet(f"font-family: {FONT_FAMILY}; font-size: 13px; font-weight: 500; color: #1A1A1A;")
             row.addWidget(icon_badge)
             row.addWidget(t_lbl, 1)
             return chip
 
-        grid.addWidget(_make_about_chip("⚡", "REAL-TIME OFFLINE SPEECH ENGINE"), 0, 0)
-        grid.addWidget(_make_about_chip("🧠", "LOCAL AI THOUGHT STRUCTURING"), 0, 1)
-        grid.addWidget(_make_about_chip("🎯", "VISUAL CONTEXT GROUNDING"), 1, 0)
-        grid.addWidget(_make_about_chip("🔒", "100% PRIVATE & ZERO TELEMETRY"), 1, 1)
+        grid.addWidget(_make_about_chip("01", "Offline speech recognition"), 0, 0)
+        grid.addWidget(_make_about_chip("02", "Local text polishing"), 0, 1)
+        grid.addWidget(_make_about_chip("03", "Screen context capture"), 1, 0)
+        grid.addWidget(_make_about_chip("04", "Private, with zero telemetry"), 1, 1)
         about_layout.addLayout(grid)
         layout.addWidget(about_card)
 
@@ -737,10 +788,10 @@ class SettingsWindow(QDialog):
         dev_card_layout.setContentsMargins(18, 12, 18, 12)
         dev_card_layout.setSpacing(8)
 
-        dev_card_layout.addWidget(_eyebrow("10 / CREATOR & COMMUNITY"))
+        dev_card_layout.addWidget(_eyebrow("Creator & community"))
 
-        author_name = QLabel("Developed with ❤️ by Pelsynergy")
-        author_name.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 14px; font-weight: 900; color: #000000;")
+        author_name = QLabel("Made by Pelsynergy")
+        author_name.setStyleSheet(f"font-family: {FONT_FAMILY_DISPLAY}; font-size: 28px; font-weight: 400; color: #1A1A1A;")
         dev_card_layout.addWidget(author_name)
 
         # Social & portfolio link buttons
@@ -751,14 +802,14 @@ class SettingsWindow(QDialog):
             btn = QPushButton(text)
             btn.setProperty("role", "secondary")
             btn.setStyleSheet(
-                f"font-family: {FONT_FAMILY_MONO}; font-size: 9px; font-weight: 900; padding: 5px 12px;"
+                f"font-family: {FONT_FAMILY_MONO}; font-size: 11px; font-weight: 700; padding: 7px 12px;"
             )
             btn.clicked.connect(lambda: webbrowser.open(url))
             return btn
 
-        links_row.addWidget(_make_link_btn("🌐 PORTFOLIO", "https://pelsynergy.framer.website/"))
-        links_row.addWidget(_make_link_btn("💼 LINKEDIN", "https://www.linkedin.com/in/pranav-kumar-95708723b/"))
-        links_row.addWidget(_make_link_btn("🐙 GITHUB", "https://github.com/Pelsynergy07/FlowState"))
+        links_row.addWidget(_make_link_btn("Portfolio ↗", "https://pelsynergy.framer.website/"))
+        links_row.addWidget(_make_link_btn("LinkedIn ↗", "https://www.linkedin.com/in/pranav-kumar-95708723b/"))
+        links_row.addWidget(_make_link_btn("GitHub ↗", "https://github.com/Pelsynergy07/FlowState"))
         links_row.addStretch(1)
         dev_card_layout.addLayout(links_row)
 
@@ -771,7 +822,7 @@ class SettingsWindow(QDialog):
         update_card_layout.setContentsMargins(18, 12, 18, 12)
         update_card_layout.setSpacing(8)
 
-        update_card_layout.addWidget(_eyebrow("11 / SYSTEM VERSION & LIVE UPDATES"))
+        update_card_layout.addWidget(_eyebrow("Version & updates"))
 
         ver_row = QHBoxLayout()
         ver_lbl = QLabel(f"FlowState v{__version__} // Windows Native x64")

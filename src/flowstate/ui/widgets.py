@@ -7,14 +7,14 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QAbstractButton, QWidget
 
 from .fonts import make_font
-from .theme import ACCENT, BORDER, FONT_FAMILY, FONT_FAMILY_MONO, FONT_FAMILY_STICKER, INK, PAPER_RAISED
+from .theme import ACCENT, BORDER, FONT_FAMILY, FONT_FAMILY_MONO, FONT_FAMILY_STICKER, INK, PAPER_RAISED, LIME, MUTED_TEXT
 
 
 class BrutalistCheckBox(QAbstractButton):
     """Custom neo-brutalist checkbox.
 
     - Bold 2px solid border with hard offset shadow
-    - Vivid Electric Cobalt fill when checked
+    - Signal lime fill and an ink checkmark when checked
     - Sharp geometric white checkmark
     - Text font is ALWAYS medium/regular weight (never bold)
     """
@@ -25,7 +25,9 @@ class BrutalistCheckBox(QAbstractButton):
         self.setCheckable(True)
         self.setChecked(checked)
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(32)
+        self.setFixedHeight(42)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setAccessibleName(text)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -44,14 +46,14 @@ class BrutalistCheckBox(QAbstractButton):
         # 2. Box surface & border
         painter.setPen(QPen(QColor(BORDER), 2))
         if self.isChecked():
-            painter.setBrush(QColor(ACCENT))
+            painter.setBrush(QColor(LIME))
         else:
             painter.setBrush(QColor(PAPER_RAISED))
         painter.drawRect(box_rect)
 
         # 3. Geometric white checkmark
         if self.isChecked():
-            painter.setPen(QPen(QColor(PAPER_RAISED), 2.2, Qt.SolidLine, Qt.SquareCap, Qt.MiterJoin))
+            painter.setPen(QPen(QColor(INK), 2.2, Qt.SolidLine, Qt.SquareCap, Qt.MiterJoin))
             check_path = QPainterPath()
             check_path.moveTo(box_rect.left() + 4.0, box_rect.top() + 9.5)
             check_path.lineTo(box_rect.left() + 7.5, box_rect.top() + 13.0)
@@ -60,10 +62,14 @@ class BrutalistCheckBox(QAbstractButton):
 
         # 4. Label text (always medium weight, never bold!)
         text_rect = QRectF(30, 0, self.width() - 32, self.height())
-        painter.setPen(QColor(INK))
-        font = make_font(FONT_FAMILY, 9, bold=False)
+        painter.setPen(QColor(INK if self.isEnabled() else MUTED_TEXT))
+        font = make_font(FONT_FAMILY, 10, bold=False)
         painter.setFont(font)
-        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, self.text())
+        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, self.text())
+        if self.hasFocus():
+            painter.setPen(QPen(QColor(INK), 1, Qt.DotLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 3, 3)
 
         painter.end()
 

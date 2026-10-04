@@ -86,7 +86,7 @@ class _SpatialDemoCanvas(QFrame):
             self._warning_message = ""
         self.update()
 
-    def flash_warning(self, msg: str = "⚠️ PRESS HOTKEY FIRST: Tap hotkey to start listening before dragging!") -> None:
+    def flash_warning(self, msg: str = "PRESS HOTKEY FIRST: Tap hotkey to start listening before dragging!") -> None:
         self._warning_message = msg
         self._warning_tick = 60  # ~2.4 seconds at 25fps
         self.update()
@@ -138,7 +138,7 @@ class _SpatialDemoCanvas(QFrame):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             if not self._listening_active:
-                self.flash_warning("⚠️ PRESS HOTKEY FIRST: Tap hotkey to start listening before dragging!")
+                self.flash_warning("PRESS HOTKEY FIRST: Tap hotkey to start listening before dragging!")
                 if self.on_unauthorized_drag:
                     self.on_unauthorized_drag()
                 event.accept()
@@ -205,7 +205,7 @@ class _SpatialDemoCanvas(QFrame):
         # App Window Title & Icon (Left)
         painter.setFont(make_font(FONT_FAMILY_MONO, 7.5, bold=True))
         painter.setPen(QColor("#1A1A1A"))
-        painter.drawText(16, 18, "🗔  APP // MOCKUP_01")
+        painter.drawText(16, 18, "APP // MOCKUP_01")
 
         # Native Windows Window Controls (Right: Minimize, Maximize, Close)
         ctrl_x = self.width() - 78
@@ -359,7 +359,7 @@ class _SpatialDemoCanvas(QFrame):
                     painter.drawRoundedRect(pill_rect, 9, 9)
                     painter.setFont(make_font(FONT_FAMILY_MONO, 6.8, bold=True))
                     painter.setPen(QColor("#FFFFFF"))
-                    painter.drawText(pill_rect, Qt.AlignCenter, "⌨️ Hold Ctrl + Drag")
+                    painter.drawText(pill_rect, Qt.AlignCenter, "Hold Ctrl + Drag")
                 elif tick < 45:
                     t = (tick - 10) / 35.0
                     t = t * t * (3.0 - 2.0 * t)  # Smooth ease
@@ -388,7 +388,7 @@ class _SpatialDemoCanvas(QFrame):
                     painter.drawRoundedRect(pill_rect, 9, 9)
                     painter.setFont(make_font(FONT_FAMILY_MONO, 6.8, bold=True))
                     painter.setPen(QColor("#FFFFFF"))
-                    painter.drawText(pill_rect, Qt.AlignCenter, "⌨️ Hold Ctrl + Drag")
+                    painter.drawText(pill_rect, Qt.AlignCenter, "Hold Ctrl + Drag")
                 elif tick < 62:
                     painter.setPen(QPen(QColor("#1A1A1A"), 2, Qt.DashLine))
                     painter.setBrush(QColor(0, 0, 0, 30))
@@ -408,7 +408,7 @@ class _SpatialDemoCanvas(QFrame):
                     painter.drawRoundedRect(pill_rect, 9, 9)
                     painter.setFont(make_font(FONT_FAMILY_MONO, 6.8, bold=True))
                     painter.setPen(QColor("#FFFFFF"))
-                    painter.drawText(pill_rect, Qt.AlignCenter, "✦ Release to capture")
+                    painter.drawText(pill_rect, Qt.AlignCenter, "Release to capture")
 
         # 7. Real user drag selection
         rect_to_draw = self._current_rect or self._selected_rect
@@ -435,8 +435,8 @@ class TutorialDialog(QDialog):
         self._is_step2_listening = False
         self.setWindowTitle("FlowState Quickstart")
         self.setStyleSheet(build_stylesheet())
-        self.resize(720, 630)
-        self.setMinimumSize(680, 590)
+        self.resize(820, 700)
+        self.setMinimumSize(760, 640)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         cfg = controller.config_store.config
@@ -462,7 +462,7 @@ class TutorialDialog(QDialog):
         eyebrow_row = QHBoxLayout()
         eyebrow_row.setSpacing(6)
         eyebrow_star = GeometricMotif("star", size=11, color=INK)
-        eyebrow = QLabel("SYS.01 // FIRST-TIME SETUP")
+        eyebrow = QLabel("FLOWSTATE / QUICKSTART")
         eyebrow.setProperty("role", "eyebrow")
         eyebrow_row.addWidget(eyebrow_star)
         eyebrow_row.addWidget(eyebrow)
@@ -474,7 +474,7 @@ class TutorialDialog(QDialog):
         header_text_col.addWidget(self.step_headline)
         top_row.addLayout(header_text_col, 1)
 
-        self.step_badge = StickerBadge("✦ STEP 01 / 02", bg_color=INK, text_color="#FFFFFF", is_pill=False)
+        self.step_badge = StickerBadge("STEP 01 / 02", bg_color=INK, text_color="#FFFFFF", is_pill=False)
         top_row.addWidget(self.step_badge)
         outer.addLayout(top_row)
 
@@ -557,7 +557,7 @@ class TutorialDialog(QDialog):
         bc_header = QHBoxLayout()
         bc_label = QLabel("LIVE DICTATION RESULT:")
         bc_label.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
-        self.step1_success_badge = StickerBadge("SPEECH CAPTURED! ✓", bg_color=LIME, text_color="#1A1A1A", is_pill=True)
+        self.step1_success_badge = StickerBadge("SPEECH CAPTURED", bg_color=LIME, text_color="#1A1A1A", is_pill=True)
         self.step1_success_badge.hide()
         bc_header.addWidget(bc_label)
         bc_header.addWidget(self.step1_success_badge)
@@ -620,7 +620,7 @@ class TutorialDialog(QDialog):
         action_row.addWidget(read_text)
         action_row.addStretch(1)
 
-        self.step2_hotkey_btn = QPushButton(f"🎙️ TAP HOTKEY ({self.toggle_shortcut})")
+        self.step2_hotkey_btn = QPushButton(f"TAP HOTKEY ({self.toggle_shortcut})")
         self.step2_hotkey_btn.setCursor(Qt.PointingHandCursor)
         self.step2_hotkey_btn.setFixedHeight(30)
         self.step2_hotkey_btn.setStyleSheet(
@@ -707,7 +707,7 @@ class TutorialDialog(QDialog):
         if self._is_step2_listening:
             # 1. Start listening state
             self.demo_canvas.listening_active = True
-            self.step2_hotkey_btn.setText(f"⏹️ STOP HOTKEY ({self.toggle_shortcut})")
+            self.step2_hotkey_btn.setText(f"STOP HOTKEY ({self.toggle_shortcut})")
             self.step2_hotkey_btn.setStyleSheet(
                 f"""
                 QPushButton {{
@@ -725,13 +725,13 @@ class TutorialDialog(QDialog):
                 }}
                 """
             )
-            self.step2_badge.setText("● LISTENING... Speak & Hold Ctrl+Drag")
+            self.step2_badge.setText("LISTENING... Speak & Hold Ctrl+Drag")
             self.step2_badge.setColors(LIME, "#121212")
             self.step2_badge.show()
         else:
             # 2. Stop listening and paste into context box & clipboard
             self.demo_canvas.listening_active = False
-            self.step2_hotkey_btn.setText(f"🎙️ TAP HOTKEY ({self.toggle_shortcut})")
+            self.step2_hotkey_btn.setText(f"TAP HOTKEY ({self.toggle_shortcut})")
             self.step2_hotkey_btn.setStyleSheet(
                 f"""
                 QPushButton {{
@@ -755,14 +755,14 @@ class TutorialDialog(QDialog):
             final_text = "Fix this thing"
             self.step2_text.setText(final_text)
             QApplication.clipboard().setText(final_text)
-            self.step2_badge.setText("PASTED INTO CHATBOT! ✓")
+            self.step2_badge.setText("PASTED INTO CHATBOT")
             self.step2_badge.setColors(LIME, "#121212")
             self.step2_badge.show()
             self.next_btn.setText("Open FlowState →")
             self.next_btn.setEnabled(True)
 
     def _on_unauthorized_drag(self) -> None:
-        self.step2_badge.setText(f"⚠️ TAP {self.toggle_shortcut} FIRST!")
+        self.step2_badge.setText(f"TAP {self.toggle_shortcut} FIRST!")
         self.step2_badge.setColors("#FFF3BF", "#C92A2A")
         self.step2_badge.show()
 
@@ -772,10 +772,10 @@ class TutorialDialog(QDialog):
         self.thumbnail_label.setPixmap(scaled)
         self.thumbnail_label.setStyleSheet("border: 1.5px solid #1A1A1A; background-color: #FFFFFF;")
         if self._is_step2_listening:
-            self.step2_badge.setText(f"✦ CAPTURED! Tap {self.toggle_shortcut} to finish & paste")
+            self.step2_badge.setText(f"CAPTURED! Tap {self.toggle_shortcut} to finish & paste")
             self.step2_badge.setColors(LIME, "#121212")
         else:
-            self.step2_badge.setText("COPIED & PASTED! ✓")
+            self.step2_badge.setText("COPIED & PASTED")
             self.step2_badge.setColors(LIME, "#121212")
         self.step2_badge.show()
 
@@ -790,7 +790,7 @@ class TutorialDialog(QDialog):
             self._on_spatial_selected(self.demo_canvas.broken_button_rect, pixmap)
         self._is_step2_listening = False
         self.demo_canvas.listening_active = False
-        self.step2_hotkey_btn.setText(f"🎙️ TAP HOTKEY ({self.toggle_shortcut})")
+        self.step2_hotkey_btn.setText(f"TAP HOTKEY ({self.toggle_shortcut})")
         self.step2_hotkey_btn.setStyleSheet(
             f"""
             QPushButton {{
@@ -810,7 +810,7 @@ class TutorialDialog(QDialog):
         )
         self.step2_text.setText("Fix this thing")
         QApplication.clipboard().setText("Fix this thing")
-        self.step2_badge.setText("PASTED INTO CHATBOT! ✓")
+        self.step2_badge.setText("PASTED INTO CHATBOT")
         self.step2_badge.setColors(LIME, "#121212")
         self.step2_badge.show()
         self.next_btn.setText("Open FlowState →")
@@ -820,7 +820,7 @@ class TutorialDialog(QDialog):
         if self.stack.currentIndex() == 1:
             self._is_step2_listening = True
             self.demo_canvas.listening_active = True
-            self.step2_hotkey_btn.setText(f"⏹️ STOP HOTKEY ({self.toggle_shortcut})")
+            self.step2_hotkey_btn.setText(f"STOP HOTKEY ({self.toggle_shortcut})")
             self.step2_hotkey_btn.setStyleSheet(
                 f"""
                 QPushButton {{
@@ -838,7 +838,7 @@ class TutorialDialog(QDialog):
                 }}
                 """
             )
-            self.step2_badge.setText("● LISTENING... Speak & Hold Ctrl+Drag")
+            self.step2_badge.setText("LISTENING... Speak & Hold Ctrl+Drag")
             self.step2_badge.setColors(LIME, "#121212")
             self.step2_badge.show()
 
@@ -849,7 +849,7 @@ class TutorialDialog(QDialog):
         elif self.stack.currentIndex() == 1:
             self._is_step2_listening = False
             self.demo_canvas.listening_active = False
-            self.step2_hotkey_btn.setText(f"🎙️ TAP HOTKEY ({self.toggle_shortcut})")
+            self.step2_hotkey_btn.setText(f"TAP HOTKEY ({self.toggle_shortcut})")
             self.step2_hotkey_btn.setStyleSheet(
                 f"""
                 QPushButton {{
@@ -873,7 +873,7 @@ class TutorialDialog(QDialog):
             final_text = text.strip() if text and text.strip() else "Fix this thing"
             self.step2_text.setText(final_text)
             QApplication.clipboard().setText(final_text)
-            self.step2_badge.setText("PASTED INTO CHATBOT! ✓")
+            self.step2_badge.setText("PASTED INTO CHATBOT")
             self.step2_badge.setColors(LIME, "#121212")
             self.step2_badge.show()
             self.next_btn.setText("Open FlowState →")
@@ -911,7 +911,7 @@ class TutorialDialog(QDialog):
         idx = self.stack.currentIndex()
         if idx == 0:
             self.stack.setCurrentIndex(1)
-            self.step_badge.setText("✦ STEP 02 / 02")
+            self.step_badge.setText("STEP 02 / 02")
             self.step_headline.setText("Hands-Free & Visual Capture")
             self.prev_btn.show()
             self.next_btn.setText("Open FlowState →")
@@ -926,7 +926,7 @@ class TutorialDialog(QDialog):
         idx = self.stack.currentIndex()
         if idx == 1:
             self.stack.setCurrentIndex(0)
-            self.step_badge.setText("✦ STEP 01 / 02")
+            self.step_badge.setText("STEP 01 / 02")
             self.step_headline.setText("Welcome to FlowState")
             self.prev_btn.hide()
             self.next_btn.setText("Next: Visual Highlight →")

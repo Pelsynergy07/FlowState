@@ -191,3 +191,26 @@ def test_hud_processing_state_timer(qapp):
     hud.hide_recording()
     assert not hud._timer.isActive()
 
+
+def test_old_notice_does_not_hide_a_new_recording(qapp):
+    from PySide6.QtTest import QTest
+    from flowstate.ui.hud import RecordingHUD
+    hud = RecordingHUD()
+    hud.show_notice("Check microphone", duration_ms=20)
+    hud.show_recording()
+    QTest.qWait(60)
+    assert hud.isVisible()
+    assert hud._state == "recording"
+    hud.hide_recording()
+
+
+def test_custom_checkbox_works_from_keyboard(qapp):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from flowstate.ui.widgets import BrutalistCheckBox
+    checkbox = BrutalistCheckBox("Play sound", checked=False)
+    checkbox.show()
+    checkbox.setFocus()
+    QTest.keyClick(checkbox, Qt.Key_Space)
+    assert checkbox.isChecked()
+    checkbox.close()

@@ -77,432 +77,77 @@ def apply_light_palette(app) -> None:
 
 
 def build_stylesheet() -> str:
+    """Shared desktop styling, drawn from the FlowState website's paper/ink identity."""
     arrow_path = (Path(__file__).parent.parent / "resources" / "icons" / "arrow_down.svg").as_posix()
-
     return f"""
-    * {{
-        font-family: "{FONT_FAMILY}";
-        color: {INK};
-    }}
-
-    QWidget#background {{
-        background-color: {PAPER};
-    }}
-
-    QDialog, QMainWindow {{
-        background-color: {PAPER};
-    }}
-
-    QLabel {{
-        color: {INK};
-        background: transparent;
-        border: none;
-        padding-top: 1px;
-        padding-bottom: 2px;
-    }}
-
-    QLabel[role="eyebrow"] {{
-        color: {MUTED_TEXT};
-        font-family: "{FONT_FAMILY_MONO}";
-        font-size: 10.5px;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-    }}
-
-    QLabel[role="headline"] {{
-        color: {INK};
-        font-family: "{FONT_FAMILY_DISPLAY}";
-        font-size: 36px;
-        font-weight: 400;
-    }}
-
-    QLabel[role="muted"] {{
-        color: {MUTED_TEXT};
-        font-size: 13px;
-    }}
-
-    QFrame[role="card"] {{
-        background-color: {PAPER_RAISED};
-        border: 2.5px solid {BORDER};
-        border-right: 4px solid {BORDER};
-        border-bottom: 4px solid {BORDER};
-        border-radius: {RADIUS}px;
-    }}
-
-    QFrame[role="rule"] {{
-        background-color: {LINE};
-        max-height: 1.5px;
-        min-height: 1.5px;
-        border: none;
-    }}
-
-    QTabWidget::pane {{
-        border: 2.5px solid {BORDER};
-        border-right: 4px solid {BORDER};
-        border-bottom: 4px solid {BORDER};
-        border-radius: {RADIUS}px;
-        background-color: {PAPER_RAISED};
-        top: -2px;
-    }}
-
-    /* 3D Tactile File Folder Tabs */
-    QTabBar::tab {{
-        background: #EFECE6;
-        color: #4A4A4A;
-        font-family: "{FONT_FAMILY_STICKER}";
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        padding: 7px 11px 6px 11px;
-        border: 2px solid {BORDER};
-        border-right: 3.5px solid {BORDER};
-        border-bottom: 2px solid {BORDER};
-        border-top-left-radius: 6px;
-        border-top-right-radius: 6px;
-        margin-top: 5px;
-        margin-right: 3px;
-    }}
-
-    QTabBar::tab:hover:!selected {{
-        background: #FAF7F2;
-        color: {INK};
-        margin-top: 3px;
-        padding: 9px 11px 6px 11px;
-        border-right: 4px solid {BORDER};
-    }}
-
-    QTabBar::tab:pressed {{
-        background: #E3DDD2;
-        margin-top: 6px;
-        margin-left: 2px;
-        border-right: 2px solid {BORDER};
-        border-bottom: 2px solid {BORDER};
-    }}
-
-    QTabBar::tab:selected {{
-        background: {INK};
-        color: #FFFFFF;
-        font-weight: 900;
-        padding: 9px 13px 7px 13px;
-        border: 2.5px solid {BORDER};
-        border-right: 4px solid {BORDER};
-        border-bottom: 2.5px solid {BORDER};
-        border-top-left-radius: 6px;
-        border-top-right-radius: 6px;
-        margin-top: 0px;
-        margin-left: 0px;
-        margin-right: 3px;
-    }}
-
-    QTabBar::tab:selected:pressed {{
-        margin-top: 2px;
-        margin-left: 1px;
-        border-right: 2.5px solid {BORDER};
-        border-bottom: 2.5px solid {BORDER};
-    }}
-
-    /* Faux 3D Neo-Brutalist Buttons */
-    QPushButton {{
-        background-color: #FFFFFF;
-        color: {INK};
-        border: 2px solid {BORDER};
-        border-right: 3.5px solid {BORDER};
-        border-bottom: 3.5px solid {BORDER};
-        border-radius: {RADIUS}px;
-        padding: 6px 18px;
-        font-family: "{FONT_FAMILY_STICKER}";
-        font-weight: 700;
-        font-size: 12px;
-        letter-spacing: 0.5px;
-    }}
-
-    QPushButton:hover {{
-        background-color: #FAF6EF;
-        border-right: 4px solid {BORDER};
-        border-bottom: 4px solid {BORDER};
-    }}
-
-    QPushButton:pressed {{
-        background-color: {PAPER_ALT};
-        margin-top: 2px;
-        margin-left: 2px;
-        border-right: 2px solid {BORDER};
-        border-bottom: 2px solid {BORDER};
-    }}
-
-    QPushButton:disabled {{
-        background-color: #E6E1D8;
-        color: #9C968D;
-        border: 2px solid #C4BEB4;
-        border-right: 2px solid #C4BEB4;
-        border-bottom: 2px solid #C4BEB4;
-    }}
-
-    QPushButton[role="secondary"] {{
-        background-color: #FFFFFF;
-        color: {INK};
-        border: 2px solid {BORDER};
-        border-right: 3.5px solid {BORDER};
-        border-bottom: 3.5px solid {BORDER};
-        padding: 6px 18px;
-    }}
-
-    QPushButton[role="secondary"]:hover {{
-        background-color: #FAF6EF;
-    }}
-
-    QPushButton[role="secondary"]:pressed {{
-        background-color: {PAPER_ALT};
-        margin-top: 2px;
-        margin-left: 2px;
-        border-right: 2px solid {BORDER};
-        border-bottom: 2px solid {BORDER};
-    }}
-
-    QPushButton[role="accent"], QPushButton[role="primary"] {{
-        background-color: {INK};
-        color: #FFFFFF;
-        border: 2px solid {BORDER};
-        border-right: 3.5px solid #000000;
-        border-bottom: 3.5px solid #000000;
-        padding: 6px 18px;
-    }}
-
-    QPushButton[role="accent"]:hover, QPushButton[role="primary"]:hover {{
-        background-color: #2D2D2D;
-    }}
-
-    QPushButton[role="accent"]:pressed, QPushButton[role="primary"]:pressed {{
-        background-color: #000000;
-        margin-top: 2px;
-        margin-left: 2px;
-        border-right: 2px solid #000000;
-        border-bottom: 2px solid #000000;
-    }}
-
-    QLineEdit, QSpinBox, QTextEdit, QPlainTextEdit {{
-        background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
-        border-right: 3px solid {BORDER};
-        border-bottom: 3px solid {BORDER};
-        border-radius: {RADIUS}px;
-        padding: 6px 10px;
-        font-size: 13px;
-        color: {INK};
-        selection-background-color: {INK};
-        selection-color: {PAPER_RAISED};
-    }}
-
-    QLineEdit:focus, QSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-        border: 2.5px solid {BORDER};
-        border-right: 3.5px solid {BORDER};
-        border-bottom: 3.5px solid {BORDER};
-        outline: none;
-    }}
-
-    /* QComboBox and Dropdown List View */
-    QComboBox {{
-        background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
-        border-right: 3.5px solid {BORDER};
-        border-bottom: 3.5px solid {BORDER};
-        border-radius: {RADIUS}px;
-        padding: 4px 10px;
-        padding-right: 34px;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: {INK};
-        min-height: 28px;
-    }}
-
-    QComboBox:hover {{
-        background-color: #FAF6EF;
-        border-right: 4px solid {BORDER};
-        border-bottom: 4px solid {BORDER};
-    }}
-
-    QComboBox:on {{
-        background-color: #FFFFFF;
-    }}
-
-    QComboBox::drop-down {{
-        subcontrol-origin: padding;
-        subcontrol-position: top right;
-        width: 28px;
-        background-color: {INK};
-        border-left: 2px solid {BORDER};
-        border-top-right-radius: 4px;
-        border-bottom-right-radius: 4px;
-    }}
-
-    QComboBox::down-arrow {{
-        image: url("{arrow_path}");
-        width: 10px;
-        height: 6px;
-    }}
-
-    /* Absolute light-mode styling for dropdown popup on all OS themes */
-    QComboBox QAbstractItemView,
-    QComboBox QListView {{
-        background-color: #FFFFFF !important;
-        border: 2px solid #000000 !important;
-        border-right: 3.5px solid #000000 !important;
-        border-bottom: 3.5px solid #000000 !important;
-        border-radius: 0px !important;
-        color: #121212 !important;
-        selection-background-color: #000000 !important;
-        selection-color: #FFFFFF !important;
-        outline: none;
-        padding: 4px 2px;
-        font-size: 12.5px;
-    }}
-
-    QComboBox QAbstractItemView::item,
-    QComboBox QListView::item {{
-        min-height: 32px;
-        padding: 6px 12px;
-        color: #121212 !important;
-        background-color: #FFFFFF !important;
-        border: none;
-    }}
-
-    QComboBox QAbstractItemView::item:hover,
-    QComboBox QAbstractItemView::item:selected,
-    QComboBox QListView::item:hover,
-    QComboBox QListView::item:selected {{
-        background-color: #000000 !important;
-        color: #FFFFFF !important;
-    }}
-
-    QCheckBox {{
-        font-size: 13px;
-        color: {INK};
-        spacing: 10px;
-        background: transparent;
-        border: none;
-    }}
-
-    QCheckBox::indicator {{
-        width: 18px;
-        height: 18px;
-        border-radius: 0px;
-        border: 2px solid {BORDER};
-        background: {PAPER_RAISED};
-    }}
-
-    QCheckBox::indicator:checked {{
-        background: {ACCENT};
-        border: 2px solid {BORDER};
-    }}
-
-    QSlider::groove:horizontal {{
-        height: 6px;
-        background: {PAPER_ALT};
-        border: 1.5px solid {BORDER};
-        border-radius: 0px;
-    }}
-
-    QSlider::handle:horizontal {{
-        background: {INK};
-        border: 2px solid {BORDER};
-        width: 18px;
-        height: 18px;
-        margin: -7px 0;
-        border-radius: 0px;
-    }}
-
-    QSlider::sub-page:horizontal {{
-        background: {ACCENT};
-        border: 1.5px solid {BORDER};
-    }}
-
-    QListWidget {{
-        background: {PAPER_RAISED};
-        border: 2px solid {BORDER};
-        border-radius: {RADIUS}px;
-        font-size: 13px;
-        padding: 4px;
-        color: {INK};
-    }}
-
-    QListWidget::item {{
-        padding: 10px 10px;
-        border-bottom: 1px solid {LINE};
-        color: {INK};
-    }}
-
-    QListWidget::item:selected {{
-        background: {ACCENT};
-        color: {PAPER_RAISED};
-    }}
-
-    QMenu {{
-        background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
-        border-radius: {RADIUS}px;
-        padding: 6px;
-    }}
-
-    QMenu::item {{
-        color: {INK};
-        padding: 8px 24px 8px 12px;
-        font-family: "{FONT_FAMILY}";
-        font-size: 13px;
-    }}
-
-    QMenu::item:selected {{
-        background-color: {ACCENT};
-        color: {PAPER_RAISED};
-    }}
-
-    QMenu::item:disabled {{
-        color: {MUTED_TEXT};
-    }}
-
-    QMenu::separator {{
-        height: 2px;
-        background: {BORDER};
-        margin: 6px 4px;
-    }}
-
-    QScrollBar:vertical {{
-        background: {PAPER_ALT};
-        width: 10px;
-        border-left: 1px solid {BORDER};
-    }}
-
-    QScrollBar::handle:vertical {{
-        background: {INK};
-        min-height: 24px;
-        border-radius: 0px;
-    }}
-
-    QProgressBar {{
-        background-color: {PAPER_RAISED};
-        border: 2px solid {BORDER};
-        border-radius: 0px;
-        text-align: center;
-        font-family: "{FONT_FAMILY_MONO}";
-        font-size: 11px;
-        font-weight: bold;
-        color: {INK};
-    }}
-
-    QProgressBar::chunk {{
-        background-color: {ACCENT};
-    }}
+    * {{ font-family: "{FONT_FAMILY}"; color: {INK}; }}
+    QDialog, QMainWindow, QWidget#background {{ background: {PAPER}; }}
+    QLabel {{ background: transparent; border: none; padding: 0; color: {INK}; font-size: 13px; }}
+    QLabel[role="eyebrow"] {{ font-family: "{FONT_FAMILY_MONO}"; color: {MUTED_TEXT}; font-size: 10px; font-weight: 700; letter-spacing: 1px; }}
+    QLabel[role="headline"] {{ font-family: "{FONT_FAMILY_DISPLAY}"; font-size: 42px; font-weight: 400; }}
+    QLabel[role="wordmark"] {{ font-family: "{FONT_FAMILY_DISPLAY}"; font-size: 31px; font-style: italic; }}
+    QLabel[role="muted"] {{ color: {MUTED_TEXT}; font-size: 13px; }}
+    QLabel[role="mono"] {{ font-family: "{FONT_FAMILY_MONO}"; color: {MUTED_TEXT}; font-size: 11px; }}
+    QFrame[role="card"] {{ background: {PAPER_RAISED}; border: 1px solid {LINE}; border-radius: 6px; }}
+    QFrame[role="rule"] {{ background: {LINE}; border: none; min-height: 1px; max-height: 1px; }}
+    QFrame[role="shortcut-panel"] {{ background: {PAPER_ALT}; border: 1px solid {LINE}; border-radius: 6px; }}
+    QLabel[role="key-hint"] {{ background: {PAPER_RAISED}; border: 1px solid {INK}; border-bottom: 3px solid {INK}; border-radius: 4px; padding: 5px 12px; font-family: "{FONT_FAMILY_MONO}"; font-size: 15px; font-weight: 700; }}
+    QScrollArea, QScrollArea > QWidget > QWidget {{ background: transparent; border: none; }}
+    QTabWidget::pane {{ border: none; background: transparent; top: 0; }}
+    QTabBar::tab {{ background: transparent; font-family: "{FONT_FAMILY_STICKER}"; font-weight: 700; font-size: 12px; padding: 11px 17px; margin-right: 5px; border: 1px solid transparent; border-radius: 4px; }}
+    QTabBar::tab:selected {{ background: {LIME}; color: {INK}; border: 1px solid {INK}; border-bottom: 3px solid {INK}; padding-bottom: 9px; }}
+    QTabBar::tab:hover:!selected {{ background: {PAPER_ALT}; border-color: {LINE}; }}
+    QTabBar::tab:focus {{ border: 2px solid {INK}; }}
+    QPushButton {{ background: {PAPER_RAISED}; border: 1px solid {INK}; border-right: 3px solid {INK}; border-bottom: 3px solid {INK}; border-radius: 4px; padding: 9px 18px; font-family: "{FONT_FAMILY_STICKER}"; font-weight: 700; font-size: 12px; }}
+    QPushButton:hover {{ background: {PAPER_ALT}; }}
+    QPushButton:pressed {{ background: {PAPER_ALT}; border-right: 1px solid {INK}; border-bottom: 1px solid {INK}; padding-left: 20px; padding-top: 11px; }}
+    QPushButton:focus {{ border: 2px solid {INK}; }}
+    QPushButton[role="primary"], QPushButton[role="accent"] {{ background: {LIME}; color: {INK}; }}
+    QPushButton[role="primary"]:hover, QPushButton[role="accent"]:hover {{ background: #C5F02B; }}
+    QPushButton[role="secondary"] {{ background: transparent; border: 1px solid {LINE}; }}
+    QPushButton[role="secondary"]:hover {{ background: {PAPER_ALT}; border-color: {INK}; }}
+    QPushButton[role="secondary"]:focus {{ border: 2px solid {INK}; }}
+    QPushButton:disabled, QPushButton[role="primary"]:disabled, QPushButton[role="accent"]:disabled {{ background: {PAPER_ALT}; color: #918B82; border: 1px solid {LINE}; }}
+    QLineEdit, QSpinBox, QTextEdit, QPlainTextEdit {{ background: {PAPER_RAISED}; border: 1px solid #B7B0A4; border-radius: 4px; padding: 8px 10px; font-size: 13px; selection-background-color: {LIME}; selection-color: {INK}; }}
+    QLineEdit:focus, QSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {{ border: 2px solid {INK}; }}
+    QComboBox {{ background: {PAPER_RAISED}; border: 1px solid #B7B0A4; border-bottom: 2px solid #B7B0A4; border-radius: 4px; padding: 5px 12px; padding-right: 38px; font-size: 13px; min-height: 24px; }}
+    QComboBox:hover, QComboBox:focus {{ border-color: {INK}; }}
+    QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 28px; background: {INK}; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }}
+    QComboBox::down-arrow {{ image: url("{arrow_path}"); width: 10px; height: 6px; }}
+    QComboBox QAbstractItemView {{ background: {PAPER_RAISED}; color: {INK}; border: 1px solid {INK}; selection-background-color: {LIME}; selection-color: {INK}; padding: 4px; outline: none; }}
+    QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 5px 10px; }}
+    QCheckBox {{ background: transparent; spacing: 10px; font-size: 13px; }}
+    QCheckBox::indicator {{ width: 18px; height: 18px; border: 1px solid {INK}; border-radius: 3px; background: {PAPER_RAISED}; }}
+    QCheckBox::indicator:checked {{ background: {LIME}; border: 2px solid {INK}; }}
+    QSlider::groove:horizontal {{ height: 4px; background: {LINE}; border-radius: 2px; }}
+    QSlider::sub-page:horizontal {{ background: {INK}; border-radius: 2px; }}
+    QSlider::handle:horizontal {{ background: {LIME}; border: 2px solid {INK}; width: 16px; margin: -7px 0; border-radius: 4px; }}
+    QSlider::handle:horizontal:focus {{ background: {INK}; }}
+    QListWidget {{ background: {PAPER_RAISED}; border: 1px solid {LINE}; border-radius: 4px; padding: 4px; }}
+    QListWidget::item {{ padding: 10px; border-bottom: 1px solid {LINE}; }}
+    QListWidget::item:selected {{ background: {LIME}; color: {INK}; }}
+    QMenu {{ background: {PAPER_RAISED}; border: 1px solid {INK}; border-radius: 4px; padding: 6px; }}
+    QMenu::item {{ padding: 9px 26px 9px 12px; font-size: 13px; }}
+    QMenu::item:selected {{ background: {LIME}; color: {INK}; }}
+    QMenu::item:disabled {{ color: {MUTED_TEXT}; }}
+    QMenu::separator {{ height: 1px; background: {LINE}; margin: 5px; }}
+    QScrollBar:vertical {{ background: transparent; width: 9px; margin: 0; }}
+    QScrollBar::handle:vertical {{ background: #B9B2A6; min-height: 30px; border-radius: 4px; }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+    QProgressBar {{ background: {PAPER_ALT}; border: 1px solid {INK}; border-radius: 3px; text-align: center; font-family: "{FONT_FAMILY_MONO}"; font-size: 11px; color: {INK}; }}
+    QProgressBar::chunk {{ background: {LIME}; }}
+    QToolTip {{ background: {INK}; color: {PAPER_RAISED}; border: none; padding: 6px 9px; }}
     """
 
 
 def setup_brutalist_combobox(combo) -> None:
-    """Configures a QComboBox with a dedicated QListView so Windows Dark Mode never blackouts the popup."""
+    """Use an explicit light popup, independent of the Windows theme."""
     from PySide6.QtWidgets import QListView
     view = QListView(combo)
     view.setStyleSheet(
-        "QListView { background-color: #FFFFFF !important; color: #121212 !important; "
-        "border: 2px solid #000000; border-right: 3.5px solid #000000; border-bottom: 3.5px solid #000000; outline: none; } "
-        "QListView::item { min-height: 32px; padding: 6px 12px; color: #121212 !important; background-color: #FFFFFF !important; } "
-        "QListView::item:hover, QListView::item:selected { background-color: #000000 !important; color: #FFFFFF !important; }"
+        f"QListView {{ background: {PAPER_RAISED}; color: {INK}; border: 1px solid {INK}; outline: none; padding: 4px; }} "
+        f"QListView::item {{ min-height: 30px; padding: 5px 10px; color: {INK}; background: {PAPER_RAISED}; }} "
+        f"QListView::item:hover, QListView::item:selected {{ background: {LIME}; color: {INK}; }}"
     )
     combo.setView(view)
-

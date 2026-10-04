@@ -33,13 +33,22 @@ def _image_to_dib(path: Path) -> bytes:
     return buf.getvalue()[14:]  # CF_DIB wants BITMAPINFOHEADER + pixels, no file header
 
 
-def _save_clipboard_text() -> str | None:
+def _save_clipboard() -> dict[int, object] | None:
+    """Copy text and lossless image formats before replacing the clipboard.
+
+    DIB/DIBV5 and registered PNG bytes can be restored after EmptyClipboard;
+    CF_BITMAP is a GDI handle and cannot safely outlive that operation.
+    """
     try:
         win32clipboard.OpenClipboard()
         try:
-            if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_UNICODETEXT):
-                return win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
-            return None
+            formats = [win32con.CF_UNICODETEXT, win32con.CF_DIB, 17,
+                       win32clipboard.RegisterClipboardFormat("PNG")]
+            snapshot = {}
+            for fmt in formats:
+                if win32clipboard.IsClipboardFormatAvailable(fmt):
+                    snapshot[fmt] = win32clipboard.GetClipboardData(fmt)
+            return snapshot or None
         finally:
             win32clipboard.CloseClipboard()
     except Exception:
@@ -66,15 +75,17 @@ def _set_clipboard_image(image_path: Path) -> None:
         win32clipboard.CloseClipboard()
 
 
-def _restore_clipboard(previous_text: str | None) -> None:
-    if previous_text is None:
-        # If the clipboard originally had non-text data (image, files) or couldn't
-        # be read, do not wipe the clipboard.
+def _restore_clipboard(snapshot: dict[int, object] | str | None) -> None:
+    if snapshot is None:
         return
+    # Retain compatibility with callers that saved only text.
+    if isinstance(snapshot, str):
+        snapshot = {win32con.CF_UNICODETEXT: snapshot}
     win32clipboard.OpenClipboard()
     try:
         win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, previous_text)
+        for fmt, data in snapshot.items():
+            win32clipboard.SetClipboardData(fmt, data)
     finally:
         win32clipboard.CloseClipboard()
 
@@ -96,19 +107,22 @@ def paste_transcript(text: str, image_paths: list[Path] | None = None) -> None:
     separate paste instead. Restores the original clipboard afterwards
     either way, since everything's already been delivered directly."""
     image_paths = [p for p in (image_paths or []) if p.exists()]
-    previous_text = _save_clipboard_text()
-
-    _set_clipboard_text(text)
-    _send_ctrl_v()
-    time.sleep(PASTE_SETTLE_SECONDS)
-
-    for image_path in image_paths:
-        try:
-            _set_clipboard_image(image_path)
-        except Exception:
-            logger.warning("Failed to place %s on clipboard", image_path, exc_info=True)
-            continue
+    snapshot = _save_clipboard()
+    try:
+        _set_clipboard_text(text)
         _send_ctrl_v()
         time.sleep(PASTE_SETTLE_SECONDS)
 
-    _restore_clipboard(previous_text)
+        for image_path in image_paths:
+            try:
+                _set_clipboard_image(image_path)
+            except Exception:
+                logger.warning("Failed to place %s on clipboard", image_path, exc_info=True)
+                continue
+            _send_ctrl_v()
+            time.sleep(PASTE_SETTLE_SECONDS)
+    finally:
+        try:
+            _restore_clipboard(snapshot)
+        except Exception:
+            logger.warning("Failed to restore original clipboard", exc_info=True)
