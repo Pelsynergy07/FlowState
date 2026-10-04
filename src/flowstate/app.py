@@ -35,6 +35,8 @@ from .inject.paste import paste_transcript
 from .session.model import Session
 from .session.store import create_session, enforce_retention, save_session
 from .text.pipeline import CleanupPipeline
+from .text.structure import structure_text
+from .streaming import StreamingDictation
 
 logger = logging.getLogger("flowstate.app")
 
@@ -82,6 +84,7 @@ class RecordingController:
         self._captured_images: list[Path] = []
         self._capture_offsets: list[float] = []  # seconds into the recording, one per captured image
         self._recording_start_monotonic: float | None = None
+        self._streaming: StreamingDictation | None = None
 
     @staticmethod
     def _resolve_device_index(name: str | None) -> int | None:
@@ -122,6 +125,9 @@ class RecordingController:
 
     def stop(self) -> None:
         self._hotkeys.stop()
+        if self._streaming is not None:
+            self._streaming.stop_capture()
+        self._recorder.abort_and_close()
 
     def switch_microphone(self, device_name: str | None) -> None:
         """Dynamically switches active microphone device at runtime without requiring restart."""
@@ -185,6 +191,10 @@ class RecordingController:
     def _recover_recording_error(self, exc: Exception) -> None:
         """Device/file errors must not leave the HUD and hotkeys stuck busy."""
         logger.error("Recording failed", exc_info=True)
+        streaming = getattr(self, "_streaming", None)
+        if streaming is not None:
+            streaming.stop_capture()
+            self._streaming = None
         if self._capture_hook is not None:
             try:
                 self._capture_hook.stop()
@@ -228,6 +238,8 @@ class RecordingController:
 
         self._recorder.start()
         self._recording_start_monotonic = time.monotonic()
+        self._streaming = StreamingDictation(self._recorder, self._asr, self._pipeline, self._current_session.folder)
+        self._streaming.start()
         logger.info("Recording started (mode: %s, source app: %s)", mode, source_app)
         self.signals.recording_started.emit()
 
@@ -336,6 +348,10 @@ class RecordingController:
         self._capture_offsets = []
 
         wav_path = session.folder / "audio.wav"
+        streaming = getattr(self, "_streaming", None)
+        self._streaming = None
+        if streaming is not None:
+            streaming.stop_capture()
         self._recorder.stop_and_save(wav_path)
         self.signals.processing_started.emit()
 
@@ -343,7 +359,7 @@ class RecordingController:
         # thread so the hotkey worker thread is freed immediately.
         threading.Thread(
             target=self._process_recording,
-            args=(wav_path, session, current_hwnd, captured_images, capture_offsets),
+            args=(wav_path, session, current_hwnd, captured_images, capture_offsets, streaming),
             daemon=True,
         ).start()
 
@@ -354,14 +370,20 @@ class RecordingController:
         current_hwnd: int | None,
         captured_images: list[Path],
         capture_offsets: list[float],
+        streaming: StreamingDictation | None = None,
     ) -> None:
+        started = time.monotonic()
         try:
-            segments = self._asr.transcribe_segments(wav_path)
+            if streaming is not None:
+                segments, cleaned_text = streaming.finish(wav_path)
+            else:
+                segments = self._asr.transcribe_segments(wav_path)
+                cleaned_text = structure_text(self._pipeline.run(" ".join(text for _, _, text in segments)))
             raw_text = " ".join(text for _start, _end, text in segments)
             # Keep the full ASR output available for recovery/debugging even if
             # formatting or pasting fails. Startup history purging still applies.
             (session.folder / "raw_transcript.txt").write_text(raw_text, encoding="utf-8")
-            cleaned_text = self._pipeline.run(raw_text)
+            logger.info("Stop-to-transcript processing: %.2fs (%d words)", time.monotonic() - started, len(raw_text.split()))
             logger.info("Transcribed: %r", cleaned_text)
 
             final_text = cleaned_text + self._build_capture_references(segments, captured_images, capture_offsets)

@@ -122,6 +122,28 @@ class Recorder:
 
         return wav_path
 
+    def snapshot_audio(self, start_seconds: float = 0.0, end_seconds: float | None = None) -> tuple[np.ndarray, int]:
+        """Read a window without consuming the full recording's audio.
+
+        Only copy queue references under its lock; slicing/concatenation happen
+        outside it so microphone callbacks remain fast.
+        """
+        with self._queue.mutex:
+            chunks = list(self._queue.queue)
+        start = int(start_seconds * self._samplerate)
+        end = int(end_seconds * self._samplerate) if end_seconds is not None else sum(len(c) for c in chunks)
+        pieces = []
+        position = 0
+        for chunk in chunks:
+            stop = position + len(chunk)
+            if stop > start and position < end:
+                pieces.append(chunk[max(0, start - position):min(len(chunk), end - position)])
+            position = stop
+            if position >= end:
+                break
+        audio = np.concatenate(pieces, axis=0) if pieces else np.zeros((0, CHANNELS), dtype=np.int16)
+        return audio, self._samplerate
+
     def level(self) -> float:
         """Approximate current input level (0..1), for the HUD meter.
         Best-effort peek at the tail of the queue without draining it.

@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -68,3 +69,15 @@ def test_non_network_load_failure_gets_a_distinct_message(monkeypatch):
 
     with pytest.raises(RuntimeError, match="corrupt model file"):
         engine._load()
+
+
+def test_missing_word_timestamps_triggers_full_audio_recovery():
+    from pathlib import Path
+    engine = TranscriptionEngine()
+    engine._model = MagicMock()
+    segment = MagicMock()
+    segment.text = "important speech"
+    segment.words = None
+    engine._model.transcribe.return_value = (iter([segment]), None)
+    with pytest.raises(RuntimeError, match="recovering full recording"):
+        engine.transcribe_words(Path("audio.wav"))

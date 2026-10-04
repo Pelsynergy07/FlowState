@@ -20,10 +20,10 @@ class CleanupPipeline:
     def preload(self) -> bool:
         return self._formatter.preload()
 
-    def run(self, text: str) -> str:
+    def run(self, text: str, *, budget_seconds: float | None = None, allow_load: bool = True, cancel_event=None) -> str:
         result = text
         if self.vocabulary_enabled:
             result = apply_vocabulary(result)
         if self.grammar_enabled:
-            result = self._formatter.correct(result)
+            result = self._formatter.correct(result, budget_seconds=budget_seconds, allow_load=allow_load, cancel_event=cancel_event)
         return result

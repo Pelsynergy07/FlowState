@@ -42,6 +42,7 @@ def test_model_summary_or_missing_middle_is_rejected():
     assert _complete_rewrite("hello this is the full text", "Hello, this is the full text.")
     assert _complete_rewrite("number one milk number two eggs number three bread", "1. Milk\n2. Eggs\n3. Bread")
     assert not _complete_rewrite("buy one book and two pens", "Buy a book and pens.")
+    assert not _complete_rewrite("dear John please review the report", "Dear John, please review the report. Thanks, Pranav.")
 
 
 def test_failure_in_one_chunk_keeps_that_chunk_and_continues(monkeypatch):
@@ -84,3 +85,23 @@ def test_busy_formatter_does_not_block_or_drop_text():
         formatter._llm.create_chat_completion.assert_not_called()
     finally:
         formatter._inference_lock.release()
+
+
+def test_stopping_recording_cancels_live_polishing_without_partial_output():
+    import threading
+    event = threading.Event()
+    formatter = fake_formatter()
+    closed = []
+    def response(**kwargs):
+        try:
+            yield {"choices": [{"delta": {"content": "Partial "}, "finish_reason": None}]}
+            event.set()
+            yield {"choices": [{"delta": {"content": "rewrite"}, "finish_reason": "stop"}]}
+        finally:
+            closed.append(True)
+    formatter._llm.create_chat_completion.side_effect = response
+    source = "all original words must remain here"
+    assert formatter.correct(source, cancel_event=event) == source
+    assert closed == [True]
+    assert formatter._inference_lock.acquire(blocking=False)
+    formatter._inference_lock.release()

@@ -7,12 +7,15 @@ machine, what is it actually doing" more than at contributing code.
 ## The short version
 
 1. You press a hotkey. FlowState starts recording your microphone.
-2. You press the hotkey again (or release it, for push-to-talk).
-   FlowState stops recording, transcribes the audio locally with
-   [Whisper](https://github.com/openai/whisper), cleans up the text with a
-   small local language model, and pastes the result into whatever text
-   field was focused when you started.
-3. Nothing about your voice or the transcript ever leaves your machine.
+2. While you speak, FlowState transcribes overlapping audio windows locally
+   with [Whisper](https://github.com/openai/whisper) and polishes completed
+   sections in the background. Overlap supplies context at window boundaries;
+   timestamps keep each window's words in their original order.
+3. You press the hotkey again (or release it, for push-to-talk). FlowState
+   finishes the remaining audio, joins the completed sections, lays out emails
+   and lists, and pastes the complete result into the text field focused when
+   you started. Slow or incomplete polishing retains the original text.
+4. Nothing about your voice or the transcript ever leaves your machine.
    Both AI models run locally; the only network activity FlowState ever
    does is downloading those models once, from Hugging Face, the first
    time each is needed.

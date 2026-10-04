@@ -258,3 +258,18 @@ class TranscriptionEngine:
 
     def transcribe(self, wav_path: Path) -> str:
         return " ".join(text for _start, _end, text in self.transcribe_segments(wav_path)).strip()
+
+    def transcribe_words(self, wav_path: Path) -> list[tuple[float, float, str]]:
+        """Word timings let overlapping live windows retain boundary words."""
+        if self._model is None:
+            self._load()
+        segments, _info = self._model.transcribe(
+            str(wav_path), beam_size=5, word_timestamps=True,
+            condition_on_previous_text=False,
+        )
+        words = []
+        for segment in segments:
+            if segment.text.strip() and not segment.words:
+                raise RuntimeError("Speech was recognized without word timing; recovering full recording")
+            words.extend((word.start, word.end, word.word.strip()) for word in (segment.words or []) if word.word.strip())
+        return words
