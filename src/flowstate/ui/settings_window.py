@@ -100,6 +100,7 @@ def _open_path(path: Path) -> None:
 
 class SettingsWindow(QDialog):
     history_cleared = Signal()
+    update_checked = Signal(object)
 
     def __init__(
         self,
@@ -245,6 +246,17 @@ class SettingsWindow(QDialog):
         self._greeting_timer.setInterval(60_000)
         self._greeting_timer.timeout.connect(self._refresh_greeting)
         self._greeting_timer.start()
+        self._update_signals = UpdateNotifierSignals(self)
+        self._update_signals.checked.connect(self._on_update_checked)
+        self._update_signals.failed.connect(self._on_update_failed)
+        self._update_check_running = False
+        self._history_signature = None
+        self._history_timer = QTimer(self)
+        self._history_timer.setInterval(2000)
+        self._history_timer.timeout.connect(self._poll_history)
+        self._history_timer.start()
+        if controller is not None and hasattr(controller, "signals"):
+            controller.signals.recording_finished.connect(self._on_recording_finished)
 
     def _refresh_greeting(self) -> None:
         greeting = _greeting_for_hour(datetime.now().hour)
@@ -255,6 +267,27 @@ class SettingsWindow(QDialog):
         self._refresh_greeting()
         self._refresh_history_list()
         super().showEvent(event)
+        if self._on_update_requested is not None:
+            self._manual_check_updates()
+
+    @Slot(str)
+    def _on_recording_finished(self, _text: str) -> None:
+        self.refresh_history()
+
+    @Slot()
+    def _poll_history(self) -> None:
+        if not self.isVisible() or self.tabs.tabText(self.tabs.currentIndex()) != "History":
+            return
+        signature = []
+        for folder in list_sessions():
+            try:
+                stat = (folder / "transcript.txt").stat()
+                signature.append((folder.name, stat.st_mtime_ns, stat.st_size))
+            except OSError:
+                continue
+        if signature != self._history_signature:
+            self._history_signature = signature
+            self._refresh_history_list()
 
     @Slot(int)
     def _on_history_tab_selected(self, index: int) -> None:
@@ -610,6 +643,7 @@ class SettingsWindow(QDialog):
             item = self._history_layout.takeAt(0)
             widget = item.widget()
             if widget:
+                widget.hide()
                 widget.deleteLater()
 
         sessions = []
@@ -952,7 +986,8 @@ class SettingsWindow(QDialog):
         layout.addWidget(update_card)
 
         # Populate initial status
-        self.set_update_info(self._update_info)
+        if self._update_info is not None:
+            self.set_update_info(self._update_info)
 
         layout.addStretch(1)
         return page
@@ -983,21 +1018,29 @@ class SettingsWindow(QDialog):
             self._update_action_box.show()
 
     def _manual_check_updates(self) -> None:
+        if self._update_check_running:
+            return
+        self._update_check_running = True
         self._check_update_btn.setEnabled(False)
         self._check_update_btn.setText("CHECKING...")
         self._update_status_lbl.setText("Connecting to GitHub Releases...")
 
-        signals = UpdateNotifierSignals()
+        check_for_update_async(self._update_signals, force=True)
 
-        def _on_checked(info: UpdateInfo | None):
-            self._check_update_btn.setEnabled(True)
-            self._check_update_btn.setText("CHECK FOR UPDATES")
-            self.set_update_info(info)
-            if info is None:
-                self._update_status_lbl.setText(f"You are running the latest release (v{__version__}).")
+    @Slot(object)
+    def _on_update_checked(self, info: UpdateInfo | None) -> None:
+        self._update_check_running = False
+        self._check_update_btn.setEnabled(True)
+        self._check_update_btn.setText("CHECK FOR UPDATES")
+        self.set_update_info(info)
+        self.update_checked.emit(info)
 
-        signals.checked.connect(_on_checked)
-        check_for_update_async(signals, force=True)
+    @Slot(str)
+    def _on_update_failed(self, message: str) -> None:
+        self._update_check_running = False
+        self._check_update_btn.setEnabled(True)
+        self._check_update_btn.setText("TRY AGAIN")
+        self._update_status_lbl.setText(message)
 
     def _trigger_update_install(self) -> None:
         if self._update_info and self._on_update_requested:

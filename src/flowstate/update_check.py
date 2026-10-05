@@ -30,7 +30,11 @@ GITHUB_REPO = "Pelsynergy07/FlowState"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 INSTALLER_ASSET_NAME = "FlowStateSetup.exe"  # matches installer.iss's OutputBaseFilename
 REQUEST_TIMEOUT_SECONDS = 5
-CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # don't re-hit the API more than every 6h
+CHECK_INTERVAL_SECONDS = 15 * 60
+
+
+class UpdateCheckError(RuntimeError):
+    """A failed check must not be presented as an up-to-date result."""
 
 
 @dataclass(frozen=True)
@@ -71,8 +75,9 @@ def _cache_path(cache_path: Path | None) -> Path:
 
 def _load_cache(cache_path: Path) -> dict:
     try:
-        return json.loads(cache_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        data = json.loads(cache_path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
         return {}
 
 
@@ -84,6 +89,8 @@ def _save_cache(cache_path: Path, data: dict) -> None:
 
 
 def _find_installer_asset(assets: list) -> tuple[str | None, int | None]:
+    if not isinstance(assets, list):
+        return None, None
     for asset in assets:
         if isinstance(asset, dict) and asset.get("name") == INSTALLER_ASSET_NAME:
             return asset.get("browser_download_url"), asset.get("size")
@@ -103,11 +110,13 @@ def _fetch_latest_release() -> _ReleaseInfo | None:
             data = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         logger.debug("Update check request failed", exc_info=True)
-        return None
+        raise UpdateCheckError("Could not reach GitHub. Check your connection and try again.")
+    if not isinstance(data, dict):
+        raise UpdateCheckError("GitHub returned an invalid release response. Try again.")
     tag = data.get("tag_name")
     html_url = data.get("html_url")
-    if not tag or not html_url:
-        return None
+    if not isinstance(tag, str) or not isinstance(html_url, str) or _parse_version(tag) is None:
+        raise UpdateCheckError("GitHub returned an invalid release response. Try again.")
     download_url, asset_size = _find_installer_asset(data.get("assets") or [])
     return _ReleaseInfo(tag=tag, html_url=html_url, download_url=download_url, asset_size=asset_size)
 
@@ -116,6 +125,7 @@ def check_for_update(
     force: bool = False,
     cache_path: Path | None = None,
     current_version: str = __version__,
+    raise_on_error: bool = False,
 ) -> UpdateInfo | None:
     """Best-effort check for a release newer than current_version.
 
@@ -127,10 +137,12 @@ def check_for_update(
     cache = _load_cache(resolved_cache_path)
     now = time.time()
 
-    if not force and now - cache.get("checked_at", 0) < CHECK_INTERVAL_SECONDS:
+    checked_at = cache.get("checked_at", 0)
+    valid_timestamp = isinstance(checked_at, (int, float)) and 0 <= now - checked_at < CHECK_INTERVAL_SECONDS
+    if not force and valid_timestamp:
         tag = cache.get("latest_tag")
         url = cache.get("latest_url")
-        if tag and url and _is_newer(tag, current_version):
+        if isinstance(tag, str) and isinstance(url, str) and _is_newer(tag, current_version):
             return UpdateInfo(
                 version=tag.lstrip("vV"),
                 url=url,
@@ -139,8 +151,15 @@ def check_for_update(
             )
         return None
 
-    result = _fetch_latest_release()
+    try:
+        result = _fetch_latest_release()
+    except UpdateCheckError:
+        if raise_on_error:
+            raise
+        return None
     if result is None:
+        if raise_on_error:
+            raise UpdateCheckError("Could not check for updates. Try again.")
         return None
     _save_cache(
         resolved_cache_path,

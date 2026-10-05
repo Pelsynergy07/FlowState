@@ -16,15 +16,17 @@ logger = logging.getLogger("flowstate.update_check")
 
 class UpdateNotifierSignals(QObject):
     checked = Signal(object)  # UpdateInfo | None
+    failed = Signal(str)
 
 
 def check_for_update_async(signals: UpdateNotifierSignals, force: bool = False) -> None:
     def _run() -> None:
         try:
-            result = check_for_update(force=force)
-        except Exception:
+            result = check_for_update(force=force, raise_on_error=True)
+        except Exception as exc:
             logger.warning("Update check failed unexpectedly", exc_info=True)
-            result = None
+            signals.failed.emit(str(exc))
+            return
         signals.checked.emit(result)
 
     threading.Thread(target=_run, daemon=True).start()

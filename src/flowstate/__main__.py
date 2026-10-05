@@ -148,6 +148,7 @@ def main() -> int:
         try:
             if settings_dlg is not None and settings_dlg.isVisible():
                 settings_dlg.bring_to_front()
+                settings_dlg._manual_check_updates()
                 return
             settings_dlg = SettingsWindow(
                 controller.config_store,
@@ -161,6 +162,7 @@ def main() -> int:
                 tray.refresh_recent_sessions()
             settings_dlg.finished.connect(_on_closed)
             settings_dlg.history_cleared.connect(tray.refresh_recent_sessions)
+            settings_dlg.update_checked.connect(_handle_update_checked)
             settings_dlg.bring_to_front()
             logger.info("SettingsWindow brought to front successfully.")
         except Exception:
@@ -171,8 +173,8 @@ def main() -> int:
         app.quit()
 
     def start_update(info: UpdateInfo) -> None:
-        if controller.is_recording:
-            QMessageBox.information(None, "FlowState", "Finish your current recording before updating.")
+        if controller.is_recording or controller.is_processing:
+            QMessageBox.information(None, "FlowState", "Finish recording and processing before updating.")
             return
         reply = QMessageBox.question(
             None,
@@ -240,7 +242,11 @@ def main() -> int:
 
     update_signals = UpdateNotifierSignals()
     update_signals.checked.connect(_handle_update_checked)
-    check_for_update_async(update_signals)
+    check_for_update_async(update_signals, force=True)
+    update_timer = QTimer(app)
+    update_timer.setInterval(15 * 60 * 1000)
+    update_timer.timeout.connect(lambda: check_for_update_async(update_signals, force=True))
+    update_timer.start()
 
     is_first_run = ("--first-run" in sys.argv) or (not paths.first_run_flag_path().exists())
     # On first run, the onboarding dialog below does its own (visible,

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/Release-v1.0.2--beta-blue.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/tag/v1.0.2-beta)
+[![Release](https://img.shields.io/badge/Release-v1.0.3--beta-blue.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/tag/v1.0.3-beta)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=for-the-badge&logo=windows)](https://github.com/Pelsynergy07/FlowState/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
@@ -10,7 +10,7 @@
 
 ### *High-speed, 100% offline voice dictation with screen-context grounding for Windows.*
 
-[**Download Installer (v1.0.2 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.2-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
+[**Download Installer (v1.0.3 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.3-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
@@ -34,7 +34,7 @@ Everything runs **100% locally on your machine**:
 
 Grab the standalone setup installer from our latest release:
 
-👉 **[Download FlowStateSetup.exe (~1.06 GB)](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.2-beta/FlowStateSetup.exe)**
+👉 **[Download FlowStateSetup.exe (~1.06 GB)](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.3-beta/FlowStateSetup.exe)**
 
 * **System Requirements**: Windows 10 or 11 (64-bit).
 * **Hardware**:
