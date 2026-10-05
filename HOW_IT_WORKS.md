@@ -65,10 +65,15 @@ Everything lives under `%LOCALAPPDATA%\FlowState`:
   when FlowState starts; a 7-day / 500 MB limit also applies during use.
 - `config.json` -- your settings (shortcuts, microphone, capture mode,
   etc).
+- `usage.sqlite3` -- persistent local statistics and, only after opting in,
+  a bounded queue of content-free anonymous counts.
 - `logs\flowstate.log` -- a rotating log file, the main way to debug
   anything that isn't behaving.
 
-None of it is uploaded anywhere. Uninstalling FlowState deliberately
+Audio, transcripts, screenshots, and clipboard contents are never uploaded.
+Optional anonymous counters are described in [ANALYTICS.md](ANALYTICS.md).
+Upgrading replaces app binaries while preserving this data folder and model caches.
+Uninstalling FlowState deliberately
 leaves this folder alone (your session history and downloaded models
 aren't deleted out from under you), so remove it by hand if you want a
 completely clean uninstall.

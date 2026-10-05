@@ -3,7 +3,7 @@
 ; constants, so this installer is meant to run on any Windows 11 machine.
 
 #define MyAppName "FlowState"
-#define MyAppVersion "1.0.3-beta"
+#define MyAppVersion "1.0.4-beta"
 #define MyAppPublisher "FlowState"
 #define MyAppExeName "FlowState.exe"
 
@@ -19,6 +19,9 @@ AppPublisher={#MyAppPublisher}
 AppMutex=Global\FlowStateSingleInstance
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
+UsePreviousAppDir=yes
+CloseApplications=yes
+RestartApplications=no
 DisableProgramGroupPage=yes
 DisableDirPage=no
 ExtraDiskSpaceRequired=2147483648
@@ -41,7 +44,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Messages]
 BeveledLabel=SYS.01 // FLOWSTATE SETUP // v{#MyAppVersion}
 WelcomeLabel1=FlowState Setup
-WelcomeLabel2=Local, offline voice dictation for Windows.%n%n• Real-time speech transcription & smart LLM cleanup%n• Spatial visual context capture with zero cloud telemetry%n• Private, on-device AI models%n%nClick Next to proceed with installation.
+WelcomeLabel2=Local, offline voice dictation for Windows.%n%n• Real-time speech transcription & smart LLM cleanup%n• Private, on-device AI models and visual context%n• Local statistics; optional anonymous usage sharing%n%nClick Next to proceed with installation.
 SelectDirLabel3=Setup will install FlowState into the following folder. At least 4.5 GB of free disk space is recommended for the application binaries and local offline AI models.
 
 
@@ -51,6 +54,12 @@ Name: "launchatlogin"; Description: "Launch FlowState automatically when Windows
 
 [Files]
 Source: "dist\FlowState\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Replace only application binaries. Models/settings live in
+; {localappdata}\FlowState and are never removed by an upgrade.
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\_internal"
+Type: files; Name: "{app}\FlowState.exe"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

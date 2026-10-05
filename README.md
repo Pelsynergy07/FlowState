@@ -2,15 +2,15 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/Release-v1.0.3--beta-blue.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/tag/v1.0.3-beta)
+[![Release](https://img.shields.io/badge/Release-v1.0.4--beta-blue.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/tag/v1.0.4-beta)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=for-the-badge&logo=windows)](https://github.com/Pelsynergy07/FlowState/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline%20%7C%20Zero%20Telemetry-10B981.svg?style=for-the-badge)](HOW_IT_WORKS.md)
+[![Privacy](https://img.shields.io/badge/Privacy-Local%20Dictation%20%7C%20Opt--in%20Stats-10B981.svg?style=for-the-badge)](HOW_IT_WORKS.md)
 
 ### *High-speed, 100% offline voice dictation with screen-context grounding for Windows.*
 
-[**Download Installer (v1.0.3 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.3-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
+[**Download Installer (v1.0.4 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.4-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
@@ -23,7 +23,7 @@
 While dictating, you can circle an element on your screen (or Ctrl+drag a box) to capture and attach an annotated screenshot synchronized with your speech timestamps.
 
 Everything runs **100% locally on your machine**:
-* 🔒 **Zero Cloud Telemetry**: No audio, transcripts, or personal data ever leaves your computer.
+* 🔒 **Private Dictation**: Audio, transcripts, screenshots, and clipboard content stay on your computer. Anonymous usage counts are optional and off by default.
 * 🚀 **Instant Hardware Acceleration**: Utilizes your NVIDIA GPU via CUDA, or automatically switches to an optimized CPU engine if no GPU is present.
 * 🎨 **Tactile Neo-Brutalist Interface**: Physical 3D filing folder tabs, mechanical button depressions, and paper-textured aesthetics designed with love.
 * 🔄 **Seamless Auto-Updates**: 1-click built-in updater with live progress tracking and automatic relaunch.
@@ -34,7 +34,7 @@ Everything runs **100% locally on your machine**:
 
 Grab the standalone setup installer from our latest release:
 
-👉 **[Download FlowStateSetup.exe (~1.06 GB)](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.3-beta/FlowStateSetup.exe)**
+👉 **[Download FlowStateSetup.exe (~1.06 GB)](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.4-beta/FlowStateSetup.exe)**
 
 * **System Requirements**: Windows 10 or 11 (64-bit).
 * **Hardware**:
@@ -95,7 +95,7 @@ For a plain-English explanation of the pipeline and local AI models, see [**HOW_
 FlowState is built on an uncompromising privacy foundation:
 - **Audio & Transcripts**: Processed solely in RAM and stored locally under `%LOCALAPPDATA%\FlowState\sessions\`.
 - **History**: Session history is cleared each time FlowState starts. Completed transcripts from the current run remain available locally until you clear history or restart the app.
-- **Network Boundaries**: Network access is restricted exclusively to downloading public Hugging Face model weights on initial setup and checking GitHub Releases for updates. **Zero tracking. Zero telemetry. Zero external servers.**
+- **Network Boundaries**: Network access covers public model downloads and GitHub update checks. Anonymous usage counters are sent to PostHog only after explicit opt-in; speech and screen content remain local.
 
 ---
 
@@ -135,3 +135,7 @@ Please read [**CONTRIBUTING.md**](CONTRIBUTING.md) for full guidelines on code s
 * **License**: Open source under the [MIT License](LICENSE).
 * **Inspiration**: Inspired by [better-voice](https://github.com/TarunTomar122/better-voice) (macOS).
 * **Crafted with love** by [**Pelsynergy**](https://github.com/Pelsynergy07).
+
+## Usage statistics
+
+Open **Settings → Stats** for local totals and export. Optional anonymous sharing supports a private PostHog portfolio dashboard. See [ANALYTICS.md](ANALYTICS.md) for setup, exact metrics, and privacy details.

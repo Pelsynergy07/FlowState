@@ -45,6 +45,7 @@ from .fonts import make_font
 from .key_recorder import KeyRecorderWidget
 from .theme import FONT_FAMILY, FONT_FAMILY_DISPLAY, FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background, setup_brutalist_combobox
 from .widgets import BrutalistCheckBox, StickerBadge, GeometricMotif
+from .usage_stats import UsageStatsView
 
 
 def _eyebrow(text: str) -> QLabel:
@@ -214,6 +215,7 @@ class SettingsWindow(QDialog):
             (self._build_capture_tab, "Capture"),
             (self._build_history_tab, "History"),
             (self._build_about_tab, "About"),
+            (self._build_stats_tab, "Stats"),
         ):
             page = build()
             if title != "History":
@@ -349,6 +351,9 @@ class SettingsWindow(QDialog):
             pass
 
     # -- General --------------------------------------------------------
+    def _build_stats_tab(self) -> QWidget:
+        return UsageStatsView(self.config_store, getattr(self._controller, "_usage", None))
+
     def _build_general_tab(self) -> QWidget:
         cfg = self.config_store.config.general
         self._initial_mic = cfg.microphone_device
@@ -870,7 +875,7 @@ class SettingsWindow(QDialog):
         grid.addWidget(_make_about_chip("01", "Offline speech recognition"), 0, 0)
         grid.addWidget(_make_about_chip("02", "Local text polishing"), 0, 1)
         grid.addWidget(_make_about_chip("03", "Screen context capture"), 1, 0)
-        grid.addWidget(_make_about_chip("04", "Private, with zero telemetry"), 1, 1)
+        grid.addWidget(_make_about_chip("04", "Private, with optional anonymous stats"), 1, 1)
         about_layout.addLayout(grid)
         layout.addWidget(about_card)
 

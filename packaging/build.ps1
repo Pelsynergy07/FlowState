@@ -8,6 +8,9 @@ $PackagingDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $PackagingDir
 $Venv = Join-Path $ProjectRoot ".venv\Scripts"
 
+# Avoid resolving DLL dependencies from unrelated developer tools on PATH.
+$env:PATH = "$Venv;$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem"
+
 Write-Host "== 1/2: PyInstaller (onedir) ==" -ForegroundColor Cyan
 & "$Venv\python.exe" -m PyInstaller "$PackagingDir\flowstate.spec" `
     --distpath "$PackagingDir\dist" `

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import wave
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
@@ -36,6 +37,7 @@ from .session.model import Session
 from .session.store import create_session, enforce_retention, save_session
 from .text.pipeline import CleanupPipeline
 from .streaming import StreamingDictation
+from .usage import UsageStore, UsageTracker
 
 logger = logging.getLogger("flowstate.app")
 
@@ -46,6 +48,7 @@ class ControllerSignals(QObject):
     recording_finished = Signal(str)  # cleaned transcript
     no_speech_detected = Signal()
     error = Signal(str)
+    usage_updated = Signal()
     drag_selection_started = Signal(int, int)
     drag_selection_moved = Signal(int, int)
     drag_selection_ended = Signal()
@@ -84,6 +87,11 @@ class RecordingController:
         self._capture_offsets: list[float] = []  # seconds into the recording, one per captured image
         self._recording_start_monotonic: float | None = None
         self._streaming: StreamingDictation | None = None
+        try:
+            self._usage = UsageTracker(UsageStore(self.config_store._path.with_name("usage.sqlite3")), self.config_store)
+        except Exception:
+            logger.warning("Local usage statistics unavailable", exc_info=True)
+            self._usage = None
 
     @staticmethod
     def _resolve_device_index(name: str | None) -> int | None:
@@ -102,6 +110,8 @@ class RecordingController:
         return None
 
     def start(self, warmup: bool = True) -> None:
+        if self._usage is not None:
+            self._usage.start()
         self._hotkeys.start()
         enforce_retention()
         if warmup:
@@ -123,6 +133,8 @@ class RecordingController:
             logger.warning("Formatting model warmup failed", exc_info=True)
 
     def stop(self) -> None:
+        if self._usage is not None:
+            self._usage.close()
         self._hotkeys.stop()
         if self._streaming is not None:
             self._streaming.stop_capture()
@@ -372,6 +384,14 @@ class RecordingController:
         streaming: StreamingDictation | None = None,
     ) -> None:
         started = time.monotonic()
+        raw_text = ""
+        outcome = "error"
+        audio_seconds = 0.0
+        try:
+            with wave.open(str(wav_path), "rb") as audio:
+                audio_seconds = audio.getnframes() / audio.getframerate()
+        except (OSError, EOFError, wave.Error):
+            pass
         try:
             if streaming is not None:
                 segments, cleaned_text = streaming.finish(wav_path)
@@ -394,6 +414,7 @@ class RecordingController:
             if not raw_text.strip() and not captured_images:
                 logger.info("Recording finished but no speech was detected (empty transcription).")
                 self.signals.no_speech_detected.emit()
+                outcome = "empty"
             else:
                 if current_hwnd is not None:
                     restored = restore_foreground_window(current_hwnd)
@@ -408,10 +429,18 @@ class RecordingController:
                             "pasting anyway, but it may not land in the right place"
                         )
                 paste_transcript(final_text, captured_images)
+                outcome = "success"
             self.signals.recording_finished.emit(final_text)
         except Exception as exc:
             logger.error("Transcription/cleanup/paste failed", exc_info=True)
             self.signals.error.emit(str(exc))
         finally:
+            usage = getattr(self, "_usage", None)
+            if usage is not None:
+                try:
+                    usage.record(len(raw_text.split()), audio_seconds, (time.monotonic() - started) * 1000, outcome)
+                    self.signals.usage_updated.emit()
+                except Exception:
+                    logger.debug("Could not record usage counters", exc_info=True)
             self._processing = False
             self._hotkeys.reset_active_mode()

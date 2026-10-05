@@ -24,6 +24,34 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 
+# A smoke check of the frozen runtime, before opening the user app or touching
+# its model/session data. Used by release verification and upgrade tests.
+if "--verify-runtime" in sys.argv:
+    import json
+    from pathlib import Path
+    from PySide6.QtCore import qVersion
+    from PySide6.QtWidgets import QApplication
+    from flowstate.ui.settings_window import SettingsWindow
+    from flowstate.config import ConfigStore
+    from flowstate.usage import UsageStore
+    root = Path(sys.argv[sys.argv.index("--verify-runtime") + 1]).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    os.environ["LOCALAPPDATA"] = str(root)
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    application = QApplication([])
+    window = SettingsWindow(ConfigStore(path=root / "config.json"))
+    window.show()
+    application.processEvents()
+    assert window.tabs.count() == 8
+    stats = UsageStore(root / "usage.sqlite3")
+    stats.record(42, 10, 1200, "success")
+    assert stats.snapshot()["words"] == 42
+    from flowstate import __version__
+    (root / "runtime-check.json").write_text(json.dumps({"version": __version__, "qt": qVersion(),
+                                                      "tabs": window.tabs.count(), "local_stats": True}), encoding="utf-8")
+    window.close()
+    sys.exit(0)
+
 from flowstate.__main__ import main
 
 if __name__ == "__main__":

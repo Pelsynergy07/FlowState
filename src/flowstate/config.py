@@ -49,6 +49,11 @@ class ModelConfig:
 
 
 @dataclass
+class AnalyticsConfig:
+    enabled: bool = False
+
+
+@dataclass
 class FlowStateConfig:
     version: int = CONFIG_VERSION
     general: GeneralConfig = field(default_factory=GeneralConfig)
@@ -56,6 +61,7 @@ class FlowStateConfig:
     capture: CaptureConfig = field(default_factory=CaptureConfig)
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
+    analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
 
 
 _NESTED_TYPES: dict[str, type] = {
@@ -64,6 +70,7 @@ _NESTED_TYPES: dict[str, type] = {
     "capture": CaptureConfig,
     "cleanup": CleanupConfig,
     "model": ModelConfig,
+    "analytics": AnalyticsConfig,
 }
 
 

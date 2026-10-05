@@ -72,6 +72,16 @@ a = Analysis(
     cipher=block_cipher,
 )
 
+# Qt on Windows imports the Windows ICU API (unversioned symbols). A
+# Poppler/Conda ICU found on PATH exports suffixed symbols and breaks QtCore
+# before the app can start. Leave ICU resolution to Windows, never ship it.
+a.binaries = [entry for entry in a.binaries if not
+              (Path(entry[0]).name.lower() == "icuuc.dll" or
+               Path(entry[0]).name.lower().startswith("icudt"))]
+for destination, source, kind in a.binaries:
+    if "codex-runtimes" in str(source).lower():
+        raise RuntimeError(f"Foreign development runtime in app bundle: {destination}")
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
