@@ -23,6 +23,12 @@ _NUMBERS = {word: index for index, word in enumerate(
 )}
 
 
+def _capitalize_item(item: str) -> str:
+    """List items start with a capital, unless the word has its own casing (iPhone)."""
+    first = item.split(" ", 1)[0]
+    return item[:1].upper() + item[1:] if first.islower() else item
+
+
 def _is_numbered_list(text: str, markers: list[re.Match]) -> bool:
     if len(markers) < 2:
         return False
@@ -56,6 +62,45 @@ def structure_text(text: str) -> str:
     """Layout changes only: every piece of content is kept in source order."""
     if not text.strip():
         return text
+    # A dictation may contain several independent documents. Apply layout to
+    # each section rather than letting a preceding list consume an email, or
+    # requiring the greeting to be the first words of the entire recording.
+    # Keep the framing words: they are content, not commands to execute.
+    section_cues = re.compile(
+        r"(?:\bI (?:wanted|want|would like) to (?:write|send) (?:this|an?) email\b|"
+        r"\b(?:dear|hi|hello|hey)\s+[\w'-]+(?:\s+[\w'-]+)?[,!]?\s+"
+        r"(?=(?:hope|please|I|we|could|can)\b)|"
+        r"(?:shopping|grocery|packing) list\b)", re.IGNORECASE,
+    )
+    boundaries = []
+    for match in section_cues.finditer(text):
+        prefix = text[:match.start()]
+        if not prefix.strip():
+            continue
+        # Keep an explicitly dictated subject with its greeting; the email
+        # formatter below needs both to recognize the Subject line.
+        if (re.match(r"^\s*subject(?:\s+line)?(?:\s+is)?[: ]+", prefix, re.IGNORECASE)
+                and not re.search(r"\b(?:dear|hi|hello|hey)\s+", prefix, re.IGNORECASE)):
+            continue
+        boundaries.append(match.start())
+    if boundaries:
+        starts = [0, *boundaries, len(text)]
+        return "\n\n".join(structure_text(text[start:end].strip())
+                            for start, end in zip(starts, starts[1:])
+                            if text[start:end].strip())
+
+    # An explicitly named inventory is a list even without spoken markers.
+    # Limit this to short comma-delimited entries; ordinary prose and quoted
+    # values containing commas must not become arbitrary bullets.
+    inventory = re.match(
+        r"^((?:shopping|grocery|packing) list(?:\s+(?:to buy|to pack|of|is))?)\s*[:,]?\s+(.+)$",
+        text, re.IGNORECASE | re.DOTALL,
+    )
+    if inventory and not re.search(r"[\n\"“”]", inventory.group(2)):
+        entries = [entry.strip() for entry in inventory.group(2).split(",")]
+        if len(entries) >= 2 and all(entry and len(entry.split()) <= 6 for entry in entries):
+            entries[-1] = re.sub(r"^and\s+", "", entries[-1], flags=re.IGNORECASE)
+            return inventory.group(1).strip() + ":\n\n" + "\n".join("- " + _capitalize_item(entry) for entry in entries)
     subject = ""
     subject_match = re.match(
         r"^\s*subject(?:\s+line)?(?:\s+is)?[: ]+(.+?)(?=\s+(?:dear|hi|hello|hey)\s+)",
@@ -92,17 +137,21 @@ def structure_text(text: str) -> str:
         if intro and intro[-1].isalnum():
             intro += ":"
         items = []
+        outro = ""
         for index, marker in enumerate(markers):
             end = markers[index + 1].start() if index + 1 < len(markers) else len(text)
             item = text[marker.end():end].strip()
+            if index + 1 == len(markers) and "\n\n" in item:
+                # A paragraph after the last item is not part of the list.
+                item, outro = (part.strip() for part in item.split("\n\n", 1))
             if not item:
                 # Ambiguous layout must never erase an empty marker or content.
                 return subject + text
             # Recording-window boundaries are soft wraps, not new list items.
             item = re.sub(r"\s*\n+\s*", " ", item)
             prefix = "- " if marker.group("bullet") or marker.group("rendered_bullet") or use_bullets else f"{index + 1}. "
-            items.append(prefix + item)
-        text = (intro + "\n\n" if intro else "") + "\n".join(items)
+            items.append(prefix + _capitalize_item(item))
+        text = (intro + "\n\n" if intro else "") + "\n".join(items) + ("\n\n" + outro if outro else "")
     else:
         # Numbering may restart in independently polished chunks.
         count = 0
@@ -122,16 +171,28 @@ def structure_text(text: str) -> str:
         body = text[greeting.end():].strip()
         if body:
             head = head[0].upper() + head[1:]
+            body = body[0].upper() + body[1:]
+            # Common dictated pleasantry followed by the actual message.
+            # Add punctuation and a paragraph without rewriting any words.
+            body = re.sub(
+                r"^(Hope\s+[^\n.!?]{1,80}?\b(?:well|great|good|okay|ok))[.!]?\s+(?=(?:please|I|we)\b)",
+                lambda match: match.group(1) + ".\n\n", body, flags=re.IGNORECASE,
+            )
+            body = re.sub(r"(?<=\n\n)[a-z]", lambda match: match.group().upper(), body)
             text = head + ",\n\n" + body
             closing = re.search(
-                r"\b(thanks|thank you|best regards|kind regards|regards|sincerely|best wishes)[,.!]?"
+                r"\b(thanks(?:\s+regards)?|thank you|best regards|kind regards|regards|sincerely|best wishes)[,.!]?"
                 r"(?:\s+((?!(?:for|to|that|again)\b)[\w'-]+(?:\s+[\w'-]+){0,2}))?[.!]?\s*$",
                 body, flags=re.IGNORECASE,
             )
-            if closing:
+            # A closing already on its own line was laid out by the model.
+            if closing and not re.search(r"\n[^\S\n]*$", body[:closing.start()]):
                 content = body[:closing.start()].rstrip()
                 signoff = closing.group(1)
                 signoff = signoff[0].upper() + signoff[1:]
+                if signoff.casefold() == "thanks regards":
+                    signoff = "Thanks\nRegards"
                 signature = closing.group(2)
-                text = head + ",\n\n" + content + "\n\n" + signoff + ("\n" + signature if signature else "")
+                text = head + ",\n\n" + content + "\n\n" + signoff + (
+                    ",\n" + signature if signature else "")
     return subject + text.strip()

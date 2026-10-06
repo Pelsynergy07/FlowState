@@ -214,19 +214,21 @@ class _PreloadWorker(QObject):
         )
 
     def _download_formatter(self) -> None:
-        from huggingface_hub import hf_hub_download
         from ..asr.downloader import download_dir_with_progress
-        from ..text import formatter as formatter_mod
+        from ..text import llm
 
-        target_dir = paths.models_dir() / "formatter"
-        expected_bytes = formatter_mod.APPROX_SIZE_MB * 1024 * 1024
-        self.status.emit("Step 2 of 2: Downloading text formatting model (Qwen 1.5B)...")
+        # GPU machines download only the GPU model; CPU-only machines only
+        # the CPU one.
+        model = self._controller._pipeline._formatter.target_model()
+        if llm.is_cached(model):
+            return
+        target_dir = llm.model_dir(model)
+        expected_bytes = model.approx_size_mb * 1024 * 1024
+        self.status.emit(f"Step 2 of 2: Downloading text formatting model ({model.display_name})...")
         download_dir_with_progress(
             target_dir,
             expected_bytes,
-            do_download=lambda: hf_hub_download(
-                formatter_mod.MODEL_REPO, formatter_mod.MODEL_FILE, local_dir=str(target_dir)
-            ),
+            do_download=lambda: llm.download(model),
             on_progress=self._on_download_progress,
         )
 

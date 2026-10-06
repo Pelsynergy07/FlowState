@@ -1,4 +1,4 @@
-"""Orchestrates the cleanup pipeline: vocabulary pass -> smart formatting."""
+"""Orchestrates the cleanup pipeline: vocabulary pass -> rules -> smart formatting."""
 
 from __future__ import annotations
 
@@ -9,14 +9,20 @@ from .disfluency import clean_disfluencies
 from .dates import format_dates
 
 
+def apply_rules(text: str) -> str:
+    """Instant, content-preserving cleanup: fillers, dates, explicit layout cues."""
+    return structure_text(format_dates(clean_disfluencies(text)))
+
+
 class CleanupPipeline:
     def __init__(
         self,
         formatter: SmartFormatter | None = None,
         vocabulary_enabled: bool = True,
         grammar_enabled: bool = True,
+        device_preference: str = "auto",
     ):
-        self._formatter = formatter or SmartFormatter()
+        self._formatter = formatter or SmartFormatter(device_preference=device_preference)
         self.vocabulary_enabled = vocabulary_enabled
         self.grammar_enabled = grammar_enabled
 
@@ -28,11 +34,10 @@ class CleanupPipeline:
         if self.vocabulary_enabled:
             result = apply_vocabulary(result)
         if self.grammar_enabled:
-            result = format_dates(clean_disfluencies(result))
             # Explicit email/list/paragraph cues must work even if inference
-            # is cancelled or reaches its deadline. Normalize them before
-            # preservation checks so intended layout isn't treated as lost text.
-            result = structure_text(result)
-            result = self._formatter.correct(result, budget_seconds=budget_seconds, allow_load=allow_load, cancel_event=cancel_event)
-            result = structure_text(format_dates(clean_disfluencies(result)))
+            # is unavailable, cancelled or out of time.
+            result = apply_rules(result)
+            result = self._formatter.correct(result, budget_seconds=budget_seconds, allow_load=allow_load,
+                                             cancel_event=cancel_event)
+            result = apply_rules(result)
         return result

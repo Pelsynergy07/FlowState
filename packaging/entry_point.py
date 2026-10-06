@@ -23,6 +23,9 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+# Model downloads over hf-xet were seen to stall indefinitely mid-file;
+# plain HTTPS downloads resume reliably.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 # A smoke check of the frozen runtime, before opening the user app or touching
 # its model/session data. Used by release verification and upgrade tests.
@@ -46,11 +49,29 @@ if "--verify-runtime" in sys.argv:
     stats = UsageStore(root / "usage.sqlite3")
     stats.record(42, 10, 1200, "success")
     assert stats.snapshot()["words"] == 42
+    # The GPU formatter runtime must be bundled with its tokenizer.
+    import ctranslate2, tokenizers
+    from flowstate.text import guard, llm
+    assert guard.preserves_words("hello there", "Hello, there.")
     from flowstate import __version__
     (root / "runtime-check.json").write_text(json.dumps({"version": __version__, "qt": qVersion(),
                                                       "tabs": window.tabs.count(), "local_stats": True}), encoding="utf-8")
     window.close()
     sys.exit(0)
+
+# Formats a sample with the real cached formatter model (GPU or CPU) inside
+# the frozen runtime. Reads models only: nothing is downloaded or removed.
+if "--verify-formatter" in sys.argv:
+    import json
+    from pathlib import Path
+    from flowstate.text.formatter import SmartFormatter
+    report = Path(sys.argv[sys.argv.index("--verify-formatter") + 1])
+    SmartFormatter._remove_redundant_cpu_model = staticmethod(lambda: None)
+    formatter = SmartFormatter()
+    loaded = formatter.preload(allow_download=False)
+    text = formatter.correct("Hey john can we talk tomorrow thanks sarah", budget_seconds=10) if loaded else ""
+    report.write_text(json.dumps({"loaded": loaded, "runtime": formatter.runtime, "text": text}), encoding="utf-8")
+    sys.exit(0 if loaded else 1)
 
 from flowstate.__main__ import main
 

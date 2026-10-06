@@ -43,7 +43,7 @@ Grab the standalone setup installer from our latest release:
 * **No Prerequisites**: No Python, CUDA toolkits, or external dependencies required. The installer is completely self-contained.
 
 > [!TIP]
-> On first launch, FlowState displays an interactive setup dialog that downloads the local open-weights AI models (~1.6 GB for GPU Whisper + ~1.1 GB for Qwen2.5 text cleanup) directly from Hugging Face. After this initial one-time download, FlowState functions entirely offline.
+> On first launch, FlowState displays an interactive setup dialog that downloads the local open-weights AI models (on NVIDIA GPUs: ~1.6 GB Whisper + ~1.5 GB Qwen2.5 text formatting; on CPU-only machines: a smaller Whisper + ~1.1 GB Qwen2.5) directly from Hugging Face. After this initial one-time download, FlowState functions entirely offline.
 
 ---
 
@@ -81,7 +81,7 @@ FlowState hot-reloads this file automatically without needing a restart.
 | Component | Technology | Purpose |
 | :--- | :--- | :--- |
 | **Speech-to-Text** | `faster-whisper` (CTranslate2) | High-speed local Whisper speech recognition (`large-v3-turbo` on CUDA / `base.en` on CPU). |
-| **Text Structuring** | `llama-cpp-python` (`Qwen2.5-1.5B-Instruct`) | CPU-only local LLM reformatting raw stream-of-consciousness into structured lists and punctuation. |
+| **Text Structuring** | CTranslate2 on GPU / `llama-cpp-python` on CPU (`Qwen2.5-1.5B-Instruct`) | Local LLM laying out emails, lists, paragraphs and punctuation; a word-alignment guard keeps every dictated word (no paraphrasing). |
 | **Visual Grounding** | `mss` + `Pillow` + Native Hooks | Gesture detection (circle bounding & rectangle drag) with timestamped annotation. |
 | **Desktop UI** | `PySide6` (Qt for Python) | Neo-brutalist, DPI-scaled desktop shell with tray menus, waveform HUD, and settings. |
 | **Input Interception** | Low-Level Windows API Hooks | Win32 keyboard & mouse hooks (`pynput` / `pywin32`) for reliable global hotkeys. |

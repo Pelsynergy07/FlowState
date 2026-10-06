@@ -26,6 +26,13 @@ from ..cuda_support import ensure_cuda_dll_search_paths
 
 logger = logging.getLogger("flowstate.asr")
 
+# Whisper imitates the style of its prompt. Without one, long monologues
+# often come back as a single unpunctuated, lowercase run. faster-whisper
+# sends `hotwords` with every 30-second window (an initial_prompt only
+# reaches the first one when not conditioning on previous text), so
+# punctuation and capitalization hold for the whole recording.
+PUNCTUATION_PROMPT = "Hello, welcome. Here's my update: it works, and the tests pass. Thanks!"
+
 
 def _is_valid_model_dir(path: Path) -> bool:
     if not path.is_dir():
@@ -59,10 +66,24 @@ def _clean_corrupt_model_dir(path: Path) -> None:
             logger.warning("Failed to remove corrupt model directory: %s", path, exc_info=True)
 
 
+def _remove_stale_hub_caches(model_dir: Path) -> None:
+    """Earlier versions also left a full huggingface cache copy of the model
+    (models--owner--name) inside its folder: ~1.6 GB that is never read once
+    the model files sit directly in the folder."""
+    import shutil
+
+    for stale in model_dir.glob("models--*"):
+        if stale.is_dir():
+            logger.info("Removing duplicate model cache: %s", stale)
+            shutil.rmtree(stale, ignore_errors=True)
+
+
 def _ensure_model_dir(spec: models.ModelSpec) -> Path:
     target_dir = paths.models_dir() / spec.id
     found = _find_model_dir(target_dir)
     if found is not None:
+        if found == target_dir:
+            _remove_stale_hub_caches(target_dir)
         return found
     _clean_corrupt_model_dir(target_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -253,19 +274,31 @@ class TranscriptionEngine:
         it."""
         if self._model is None:
             self._load()
-        segments, _info = self._model.transcribe(str(wav_path), beam_size=5)
+        # Conditioning on previous text lets one hallucinated phrase feed the
+        # next window; on trailing silence that produced runaway invented text.
+        segments, _info = self._model.transcribe(str(wav_path), beam_size=5, hotwords=PUNCTUATION_PROMPT,
+                                                 condition_on_previous_text=False)
         return [(seg.start, seg.end, seg.text.strip()) for seg in segments if seg.text.strip()]
 
     def transcribe(self, wav_path: Path) -> str:
         return " ".join(text for _start, _end, text in self.transcribe_segments(wav_path)).strip()
 
-    def transcribe_words(self, wav_path: Path) -> list[tuple[float, float, str]]:
-        """Word timings let overlapping live windows retain boundary words."""
+    def transcribe_words(self, wav_path: Path, context: str | None = None,
+                         prompt: bool = True) -> list[tuple[float, float, str]]:
+        """Word timings let overlapping live windows retain boundary words.
+
+        context: the transcript just before this audio. Prompting with the
+        real preceding words keeps punctuation and casing continuous across
+        windows. prompt=False transcribes with no prompt at all, which never
+        makes Whisper skip the start of the audio; it is used to re-check a
+        short stretch whose words a prompted pass left out.
+        """
         if self._model is None:
             self._load()
+        options = {"hotwords": PUNCTUATION_PROMPT, "initial_prompt": context} if prompt else {}
         segments, _info = self._model.transcribe(
             str(wav_path), beam_size=5, word_timestamps=True,
-            condition_on_previous_text=False,
+            condition_on_previous_text=False, **options,
         )
         words = []
         for segment in segments:

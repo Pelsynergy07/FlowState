@@ -4,7 +4,14 @@ from datetime import datetime
 from pathlib import Path
 
 from flowstate.text.pipeline import CleanupPipeline
-from flowstate.text.formatter import SmartFormatter, _complete_rewrite
+from flowstate.text.formatter import SmartFormatter
+from flowstate.text.guard import preserves_words
+from flowstate.text.pipeline import apply_rules
+
+
+def _complete_rewrite(original, result):
+    """The result keeps every dictated word (allowing formatting edits)."""
+    return preserves_words(apply_rules(original), result)
 from flowstate.text.disfluency import clean_disfluencies
 from flowstate.text.dates import format_dates
 from flowstate.streaming import _join_sections
@@ -80,7 +87,7 @@ def test_next_one_is_not_a_marker_in_ordinary_single_use():
 
 def test_explicit_numbering_with_next_one_stays_numbered():
     assert structure_text("Tasks: number one review the budget next one is email John next one is deploy") == (
-        "Tasks:\n\n1. review the budget\n2. email John\n3. deploy"
+        "Tasks:\n\n1. Review the budget\n2. Email John\n3. Deploy"
     )
 
 

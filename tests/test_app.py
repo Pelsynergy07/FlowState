@@ -46,7 +46,8 @@ def test_long_transcript_and_screenshot_reach_saved_session_and_paste(tmp_path):
          patch("flowstate.app.paste_transcript") as paste:
         controller._process_recording(Path("audio.wav"), session, 42, [image], [179.5])
     pasted, images = paste.call_args.args
-    assert raw in pasted
+    assert raw[1:] in pasted and pasted.startswith("Spoken sentence 0")
+    assert "179\n\n[Screenshots captured" in pasted
     assert 'capture_1.png at 2:59' in pasted
     assert 'spoken sentence 179' in pasted
     assert images == [image]

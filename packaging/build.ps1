@@ -15,6 +15,7 @@ Write-Host "== 1/2: PyInstaller (onedir) ==" -ForegroundColor Cyan
 & "$Venv\python.exe" -m PyInstaller "$PackagingDir\flowstate.spec" `
     --distpath "$PackagingDir\dist" `
     --workpath "$PackagingDir\build" `
+    --clean `
     --noconfirm
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 

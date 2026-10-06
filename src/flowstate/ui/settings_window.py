@@ -252,7 +252,7 @@ class SettingsWindow(QDialog):
         self._update_signals.checked.connect(self._on_update_checked)
         self._update_signals.failed.connect(self._on_update_failed)
         self._update_check_running = False
-        self._history_signature = None
+        self._history_signature = getattr(self, "_history_signature", None)
         self._history_timer = QTimer(self)
         self._history_timer.setInterval(2000)
         self._history_timer.timeout.connect(self._poll_history)
@@ -276,10 +276,8 @@ class SettingsWindow(QDialog):
     def _on_recording_finished(self, _text: str) -> None:
         self.refresh_history()
 
-    @Slot()
-    def _poll_history(self) -> None:
-        if not self.isVisible() or self.tabs.tabText(self.tabs.currentIndex()) != "History":
-            return
+    @staticmethod
+    def _history_snapshot() -> list:
         signature = []
         for folder in list_sessions():
             try:
@@ -287,8 +285,15 @@ class SettingsWindow(QDialog):
                 signature.append((folder.name, stat.st_mtime_ns, stat.st_size))
             except OSError:
                 continue
-        if signature != self._history_signature:
-            self._history_signature = signature
+        return signature
+
+    @Slot()
+    def _poll_history(self) -> None:
+        if not self.isVisible() or self.tabs.tabText(self.tabs.currentIndex()) != "History":
+            return
+        # Only rebuild for changes no other refresh has shown yet; a rebuild
+        # resets the reader's scroll position.
+        if self._history_snapshot() != self._history_signature:
             self._refresh_history_list()
 
     @Slot(int)
@@ -643,6 +648,10 @@ class SettingsWindow(QDialog):
         QMessageBox.information(self, "FlowState History", message)
 
     def _refresh_history_list(self) -> None:
+        self._history_signature = self._history_snapshot()
+        scrollbar = self._history_scroll.verticalScrollBar()
+        position = scrollbar.value()
+        QTimer.singleShot(0, lambda: scrollbar.setValue(min(position, scrollbar.maximum())))
         # Clear existing cards
         while self._history_layout.count():
             item = self._history_layout.takeAt(0)

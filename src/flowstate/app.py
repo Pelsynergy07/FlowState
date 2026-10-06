@@ -35,6 +35,7 @@ from .inject.focus import get_foreground_window, get_window_title, restore_foreg
 from .inject.paste import paste_transcript
 from .session.model import Session
 from .session.store import create_session, enforce_retention, save_session
+from .text.formatter import capitalize_start
 from .text.pipeline import CleanupPipeline
 from .streaming import StreamingDictation
 from .usage import UsageStore, UsageTracker
@@ -66,6 +67,7 @@ class RecordingController:
         self._pipeline = CleanupPipeline(
             vocabulary_enabled=cfg.cleanup.vocabulary_enabled,
             grammar_enabled=cfg.cleanup.grammar_enabled,
+            device_preference=cfg.model.compute_device,
         )
         self._recorder = Recorder(device_index=self._resolve_device_index(cfg.general.microphone_device))
         self._capture_hook: GestureMouseHook | DragCaptureHook | None = None
@@ -304,7 +306,7 @@ class RecordingController:
         offsets = capture_offsets if capture_offsets is not None else self._capture_offsets
         if not images:
             return ""
-        lines = ["", "[Screenshots captured during this recording:]"]
+        lines = ["", "", "[Screenshots captured during this recording:]"]
         for i, (image_path, offset) in enumerate(zip(images, offsets), start=1):
             mins, secs = divmod(int(offset), 60)
             nearby = self._nearest_segment_text(segments, offset)
@@ -397,7 +399,7 @@ class RecordingController:
                 segments, cleaned_text = streaming.finish(wav_path)
             else:
                 segments = self._asr.transcribe_segments(wav_path)
-                cleaned_text = self._pipeline.run(" ".join(text for _, _, text in segments))
+                cleaned_text = capitalize_start(self._pipeline.run(" ".join(text for _, _, text in segments)))
             raw_text = " ".join(text for _start, _end, text in segments)
             # Keep the full ASR output available for recovery/debugging even if
             # formatting or pasting fails. Startup history purging still applies.

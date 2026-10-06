@@ -88,7 +88,7 @@ def test_formatter_correct_skips_when_model_not_cached():
 def test_formatter_is_ready_reflects_llm_state():
     formatter = SmartFormatter()
     assert not formatter.is_ready
-    formatter._llm = MagicMock()
+    formatter._backend = MagicMock()
     assert formatter.is_ready
 
 

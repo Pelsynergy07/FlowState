@@ -5,6 +5,7 @@ import re
 
 from flowstate.text.pipeline import CleanupPipeline
 from flowstate.text.formatter import SmartFormatter
+from tests.conftest import FakeBackend
 from flowstate.streaming import _join_sections
 from flowstate.text.structure import structure_text
 from flowstate.text.dates import format_dates
@@ -31,18 +32,14 @@ def fallback_pipeline():
 def test_unavailable_model_still_formats_email_and_bullets():
     pipeline = fallback_pipeline()
     result = pipeline.run("dear John I attached the report thanks Pranav", allow_load=False)
-    assert result == "Dear John,\n\nI attached the report\n\nThanks\nPranav"
+    assert result == "Dear John,\n\nI attached the report\n\nThanks,\nPranav"
     result = pipeline.run("Tasks: bullet point review 300 pages next bullet email John", allow_load=False)
-    assert result == "Tasks:\n\n- review 300 pages\n- email John"
+    assert result == "Tasks:\n\n- Review 300 pages\n- Email John"
 
 
 def test_layout_cues_are_normalized_before_model_content_validation():
     formatter = SmartFormatter()
-    formatter._llm = MagicMock()
-    formatter._llm.tokenize.side_effect = lambda data, **kwargs: data.split()
-    formatter._llm.create_chat_completion.return_value = iter([
-        {"choices": [{"delta": {"content": "Tasks:\n\n- Review all 300 pages\n- Email John"}, "finish_reason": "stop"}]}
-    ])
+    formatter._backend = FakeBackend(lambda s: "Tasks:\n\n- Review all 300 pages\n- Email John")
     result = CleanupPipeline(formatter, vocabulary_enabled=False).run(
         "Tasks: bullet point review all 300 pages next bullet email John"
     )
@@ -63,16 +60,12 @@ def test_live_join_keeps_a_split_list_item_on_one_line():
 
 def test_single_tail_bullet_gets_layout_even_when_polishing_is_cancelled():
     result = fallback_pipeline().run("next bullet deploy at 4 pm", allow_load=False)
-    assert result == "- deploy at 4 pm"
+    assert result == "- Deploy at 4 pm"
 
 
 def test_model_cannot_change_dictated_bullets_to_numbered_steps():
     formatter = SmartFormatter()
-    formatter._llm = MagicMock()
-    formatter._llm.tokenize.side_effect = lambda data, **kwargs: data.split()
-    formatter._llm.create_chat_completion.return_value = iter([
-        {"choices": [{"delta": {"content": "1. Review the budget\n2. Email John"}, "finish_reason": "stop"}]}
-    ])
+    formatter._backend = FakeBackend(lambda s: "1. Review the budget\n2. Email John")
     result = CleanupPipeline(formatter, vocabulary_enabled=False).run(
         "bullet point review the budget next bullet email John"
     )
@@ -83,11 +76,11 @@ def test_actual_dictated_checks_mix_ordinals_and_numeric_markers():
     result = fallback_pipeline().run(DICTATED_CHECKS, allow_load=False)
     intro = format_dates(DICTATED_CHECKS.split("First one,", 1)[0].strip())
     assert result == intro + (
-        "\n\n1. verify desktop manual setup is available."
-        "\n2. open a complete plan in the desktop importer."
-        "\n3. verify whether the importer desktop plan and habit controls are accurate."
+        "\n\n1. Verify desktop manual setup is available."
+        "\n2. Open a complete plan in the desktop importer."
+        "\n3. Verify whether the importer desktop plan and habit controls are accurate."
         "\n4. Verify actual numeric habit entry"
-        "\n5. confirm the saved numeric tracking and corrected weekly progress"
+        "\n5. Confirm the saved numeric tracking and corrected weekly progress"
     )
     assert "September 28, October 4" in result
     assert "recording 60" in result
@@ -102,8 +95,8 @@ def test_dictated_checks_still_format_across_live_chunk_boundaries():
         sections = [pipeline.run(" ".join(words[i:i + size]), allow_load=False)
                     for i in range(0, len(words), size)]
         result = structure_text(_join_sections(sections))
-        for number, phrase in enumerate(("verify desktop manual setup", "open a complete plan", "verify whether the importer",
-                                         "Verify actual numeric habit entry", "confirm the saved numeric tracking"), 1):
+        for number, phrase in enumerate(("Verify desktop manual setup", "Open a complete plan", "Verify whether the importer",
+                                         "Verify actual numeric habit entry", "Confirm the saved numeric tracking"), 1):
             assert f"{number}. {phrase}" in result
         assert result.endswith("corrected weekly progress")
 

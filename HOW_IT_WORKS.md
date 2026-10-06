@@ -29,17 +29,26 @@ your machine has a compatible NVIDIA GPU, FlowState uses the full-size
 a much smaller model (`base.en`) that runs comfortably on CPU. Either way
 this is what turns your audio into raw text.
 
-**Text cleanup: a small local LLM (Qwen2.5-1.5B-Instruct).** Runs via
-[llama.cpp](https://github.com/ggml-org/llama.cpp), CPU-only (deliberately
--- see the comment in `text/formatter.py` for why). Raw transcripts read
-like speech, not writing: run-on sentences, "number one... number
-two..." instead of an actual list, no punctuation. This model turns that
-into properly formatted text -- real numbered lists, correct
-capitalization and punctuation, and layout for a dictated greeting/sign-off.
-Fast rules remove clear speech fillers and accidental repetitions, recognize
-spoken list transitions, and format unambiguous dates. Model output is checked
-against the cleaned source words in order: it cannot replace your wording,
-summarize, invent content, or respond to a dictated question or command.
+Whisper is prompted with punctuated text (and, for each live section, the
+words just before it), so it writes sentences with punctuation and capitals
+rather than one long lowercase run.
+
+**Text cleanup: a small local LLM (Qwen2.5-1.5B-Instruct).** On an NVIDIA
+GPU it runs via [CTranslate2](https://github.com/OpenNMT/CTranslate2) (the
+same runtime as Whisper; ~1.5 GB download); on other machines it runs on
+the CPU via [llama.cpp](https://github.com/ggml-org/llama.cpp) (~1.1 GB).
+Each machine downloads only the one it uses. This model lays text out:
+emails get greeting, body and sign-off lines; enumerated items become
+numbered or bulleted lists; long prose gets paragraphs; spelling slips are
+fixed. Fast rules remove clear speech fillers and accidental repetitions,
+recognize spoken list transitions, and format unambiguous dates.
+
+Model output is aligned word by word with what you said
+(`text/guard.py`). Punctuation, layout, spelling fixes and filler removal
+are kept; any reworded, added or dropped word is put back exactly as you
+said it. If the model summarizes or answers your dictation instead of
+formatting it, its output is discarded. Speech is formatted while you talk,
+so stopping leaves only the last few seconds to process.
 
 Both models are ordinary, publicly available open models -- nothing
 proprietary or FlowState-specific about them.
