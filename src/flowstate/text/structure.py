@@ -237,4 +237,117 @@ def structure_text(text: str) -> str:
                 signature = closing.group(2)
                 text = head + ",\n\n" + content + "\n\n" + signoff + (
                     ",\n" + signature if signature else "")
-    return subject + text.strip()
+    return subject + _paragraphs(text.strip())
+
+
+_TRANSITION = re.compile(
+    r"(?:Also|And also|Another|Now|Anyway|Next|Then|Okay,? so|So|Let me|Besides|Finally|Lastly|Additionally|"
+    r"Apart from that|On top of that|Moreover|However|But|Plus|Oh,? and|One more thing|By the way|The other thing)\b")
+
+
+_LIST_REQUEST = re.compile(
+    r"\b(?:bullet(?:ed)? list|bullet points|numbered list|make a list|add a list|as a list|list (?:them|these|it))\b",
+    re.IGNORECASE)
+_SENTENCES = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"“])")
+# A lead-in like "We need ..." / "I want to buy ..." begins with its subject.
+_SUBJECT_START = r"(?:i|i'm|we|we're|you|they|he|she|it|my|our|let's|can|could|please|here)\b"
+
+
+def _requested_series(text: str):
+    """"...let's add a bullet list. I want to buy a Porsche Macan, a Porsche
+    Cayenne, and a Range Rover." -> intro "I want to buy" and three items.
+
+    Only a series of three or more short items, within four sentences after
+    the speaker asked for a list. Ordinary sentences ("I met John, Sarah
+    and Mike") stay prose. Returns (before, intro, items, after) or None.
+    """
+    sentences = _SENTENCES.split(text)
+    for index, sentence in enumerate(sentences):
+        if not _LIST_REQUEST.search(sentence):
+            continue
+        for offset in (1, 2, 3, 4):
+            if index + offset >= len(sentences):
+                break
+            parsed = _parse_series(sentences[index + offset])
+            if parsed is not None:
+                lead, intro, items = parsed
+                before = " ".join([*sentences[:index + offset], lead]).strip()
+                return before, intro, items, " ".join(sentences[index + offset + 1:])
+    return None
+
+
+def _parse_series(sentence: str):
+    """Returns (earlier prose, lead-in, items) for a sentence ending in a
+    series: "..., I want to buy a Macan, a Cayenne(,) and a Range Rover."."""
+    body = sentence.rstrip()
+    end = body[-1] if body[-1:] in ".!?" else ""
+    body = body[:-1] if end else body
+    parts = [part.strip() for part in body.split(",")]
+    if len(parts) < 2:
+        return None
+    # A series ends "..., and X" or, without the serial comma, "Y and X".
+    joined = re.match(r"^(?:and|or)\s+(.+)$", parts[-1], re.IGNORECASE)
+    if joined:
+        parts[-1] = joined.group(1)
+    else:
+        pair = re.match(r"^(.+?)\s+(?:and|or)\s+(.+)$", parts[-1], re.IGNORECASE)
+        if not pair:
+            return None
+        parts[-1:] = [pair.group(1), pair.group(2)]
+    # The items are the short parts at the end; the part before them holds
+    # the lead-in and the first item, and anything earlier stays prose.
+    i = len(parts) - 1
+    while i > 0 and 0 < len(parts[i].split()) <= 5:
+        i -= 1
+    others = parts[i + 1:]
+    if len(others) < 2:
+        return None
+    earlier = ", ".join(parts[:i])
+    if earlier:
+        earlier += "."
+    # The first item is the end of the first part, shaped like the others:
+    # after the same article ("a Porsche ..."), or the same number of words.
+    first_words = parts[i].split()
+    article = others[0].split()[0].lower()
+    if article in ("a", "an", "the") and article in (w.lower() for w in first_words[1:]):
+        cut = max(i for i, w in enumerate(first_words) if w.lower() == article and i > 0)
+    elif re.match(_SUBJECT_START, parts[i], re.IGNORECASE):
+        cut = len(first_words) - len(others[0].split())
+    else:
+        # "Pick up the kids, buy groceries, and call mom": a series of
+        # actions with no lead-in; the whole first part is the first item.
+        cut = 0
+    intro, first = " ".join(first_words[:cut]), " ".join(first_words[cut:])
+    if cut < 0 or not first or len(first.split()) > 5:
+        return None
+    return earlier, intro, [first, *others]
+
+
+def _paragraphs(text: str) -> str:
+    """Break long dictated prose into paragraphs, without changing a word.
+
+    A new paragraph starts at a sentence that opens with a transition
+    ("Also,", "Now,", "Let me...") once the current one has some substance,
+    or at any sentence break once it gets long. Each existing paragraph is
+    handled on its own; lists and other line-broken blocks are left as is.
+    """
+    blocks = text.split("\n\n")
+    if len(blocks) > 1:
+        return "\n\n".join(block if "\n" in block else _paragraphs(block) for block in blocks)
+    if "\n" in text:
+        return text
+    series = _requested_series(text)
+    if series is not None:
+        before, intro, items, after = series
+        block = (intro + ":\n\n" if intro else "") + "\n".join("- " + _capitalize_item(item) for item in items)
+        return "\n\n".join(part for part in (_paragraphs(before), block, _paragraphs(after)) if part)
+    if len(text.split()) < 70:
+        return text
+    paragraphs: list[list[str]] = [[]]
+    for sentence in _SENTENCES.split(text):
+        current = paragraphs[-1]
+        words = sum(len(s.split()) for s in current)
+        if current and ((_TRANSITION.match(sentence) and words >= 30 and len(current) >= 2) or words >= 110):
+            paragraphs.append([])
+        paragraphs[-1].append(sentence)
+    return "\n\n".join(" ".join(paragraph) for paragraph in paragraphs)

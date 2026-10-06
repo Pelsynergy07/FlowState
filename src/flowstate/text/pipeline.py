@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .formatter import SmartFormatter
+from .formatter import SmartFormatter, needs_polish
 from .vocabulary import apply_vocabulary
 from .structure import structure_text
 from .disfluency import clean_disfluencies
@@ -29,7 +29,8 @@ class CleanupPipeline:
     def preload(self) -> bool:
         return self._formatter.preload()
 
-    def run(self, text: str, *, budget_seconds: float | None = None, allow_load: bool = True, cancel_event=None) -> str:
+    def run(self, text: str, *, budget_seconds: float | None = None, allow_load: bool = True, cancel_event=None,
+            polish: bool | None = None) -> str:
         result = text
         if self.vocabulary_enabled:
             result = apply_vocabulary(result)
@@ -37,7 +38,10 @@ class CleanupPipeline:
             # Explicit email/list/paragraph cues must work even if inference
             # is unavailable, cancelled or out of time.
             result = apply_rules(result)
-            result = self._formatter.correct(result, budget_seconds=budget_seconds, allow_load=allow_load,
-                                             cancel_event=cancel_event)
-            result = apply_rules(result)
+            # The model only helps where Whisper's punctuation is missing; on
+            # punctuated speech it copies the text and just costs time.
+            if needs_polish(result) if polish is None else polish:
+                result = self._formatter.correct(result, budget_seconds=budget_seconds, allow_load=allow_load,
+                                                 cancel_event=cancel_event)
+                result = apply_rules(result)
         return result

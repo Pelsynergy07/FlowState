@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .text.formatter import capitalize_start, join_sections
+from .text.formatter import capitalize_start, join_sections, needs_polish
 from .text.guard import preserves_words, repair
 from .text.pipeline import apply_rules
 from .text.vocabulary import apply_vocabulary
@@ -18,7 +18,7 @@ from .text.vocabulary import apply_vocabulary
 logger = logging.getLogger("flowstate.streaming")
 # Short live windows keep the work left after the user stops small: at most
 # STEP + LOOKAHEAD seconds of speech are transcribed and formatted then.
-STEP_SECONDS = 14.0
+STEP_SECONDS = 10.0
 OVERLAP_SECONDS = 6.0
 LOOKAHEAD_SECONDS = 4.0
 LIVE_BUDGET_SECONDS = 8.0
@@ -90,7 +90,8 @@ class StreamingDictation:
             self._error = exc
             logger.warning("Live processing failed; full recording will be recovered at stop", exc_info=True)
 
-    def _process(self, audio, rate: int, begin: float, cutoff: float, *, budget: float, final: bool = False) -> None:
+    def _process(self, audio, rate: int, begin: float, cutoff: float, *, budget: float, final: bool = False,
+                 deadline: float | None = None) -> None:
         path = self._folder / "_live_window.wav"
         try:
             with wave.open(str(path), "wb") as wav:
@@ -160,7 +161,8 @@ class StreamingDictation:
                 ends = [k for k in late if _SENTENCE_END.search(owned[k][2])]
                 # Otherwise the longest pause: a clause boundary, not mid-phrase.
                 pause = lambda k: owned[k + 1][0] - owned[k][1]
-                longest = max(late, key=pause, default=None)
+                # Among equally long pauses, the latest: longer sections, fewer seams.
+                longest = max(late, key=lambda k: (round(pause(k), 2), k), default=None)
                 cut = ends[-1] if ends else (longest if longest is not None and pause(longest) >= 0.25 else None)
                 if cut is not None:
                     owned = owned[:cut + 1]
@@ -170,8 +172,17 @@ class StreamingDictation:
             self._pending = [word for word in candidates if _mid(word) >= cutoff] if not final else []
             raw = " ".join(text for _, _, text in owned)
             if raw:
+                polish = None  # automatic: only where punctuation is missing
+                if deadline is not None:
+                    # After stop the user is waiting: transcription already
+                    # used part of the time. Rules always run; the model only
+                    # if Whisper's punctuation is missing (it mostly copies
+                    # punctuated speech, and a busy GPU can make it slow).
+                    budget = max(0.3, deadline - time.monotonic())
+                    polish = needs_polish(raw)
                 cleaned = self._pipeline.run(raw, budget_seconds=budget, allow_load=False,
-                                             cancel_event=None if final else _StopDeadline(self._stop))
+                                             cancel_event=None if final else _StopDeadline(self._stop),
+                                             polish=polish)
                 self._segments.append((owned[0][0], owned[-1][1], raw))
                 self._cleaned.append(cleaned)
                 self._words.extend(owned)
@@ -207,6 +218,7 @@ class StreamingDictation:
         started = time.monotonic()
         self.stop_capture()
         self._thread.join()
+        waited = time.monotonic() - started
         if self._error is not None:
             # Never deliver a partial prefix after any failed live window.
             return self._recover(wav_path)
@@ -216,13 +228,13 @@ class StreamingDictation:
             begin = self._window_begin()
             wav.setpos(min(wav.getnframes(), int(begin * rate)))
             audio = np.frombuffer(wav.readframes(wav.getnframes() - wav.tell()), dtype=np.int16)
+        tail_seconds = max(0.0, duration - self._cursor)
         if duration > self._cursor:
-            # Only the tail is left; it gets whatever remains of the budget.
-            budget = max(0.5, FINISH_BUDGET_SECONDS - (time.monotonic() - started))
             # Whisper can align its last word slightly beyond the WAV's end.
             # The final window must keep it rather than treat padding as a cutoff.
             try:
-                self._process(audio, rate, begin, duration, budget=budget, final=True)
+                self._process(audio, rate, begin, duration, budget=FINISH_BUDGET_SECONDS, final=True,
+                              deadline=started + FINISH_BUDGET_SECONDS)
             except Exception:
                 logger.warning("Final live window failed; recovering complete recording", exc_info=True)
                 return self._recover(wav_path)
@@ -237,12 +249,15 @@ class StreamingDictation:
                 # Never deliver a section that lost or changed words.
                 logger.info("Assembled sections changed wording; restoring source words.")
                 joined = repair(source, joined) or source
+        logger.info("Stop: %.2fs finishing the live section, %.2fs for the last %.1fs of audio",
+                    waited, time.monotonic() - started - waited, tail_seconds)
         return list(self._segments), joined
 
     def _recover(self, wav_path: Path) -> tuple[list[tuple[float, float, str]], str]:
         segments = self._engine.transcribe_segments(wav_path)
         raw = " ".join(text for _, _, text in segments)
-        return segments, capitalize_start(self._pipeline.run(raw, budget_seconds=FINISH_BUDGET_SECONDS, allow_load=False))
+        return segments, capitalize_start(self._pipeline.run(raw, budget_seconds=FINISH_BUDGET_SECONDS, allow_load=False,
+                                                             polish=needs_polish(raw)))
 
 
 def _has_speech(audio, rate: int, begin: float, start: float, end: float) -> bool:

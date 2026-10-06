@@ -125,7 +125,9 @@ def test_timestamp_jitter_does_not_drop_or_duplicate_seam_word(tmp_path):
     words = [(i - .1, i + .1, f"word{i}") for i in range(1, 20)]
     stream = StreamingDictation(None, JitterEngine(words), pipeline(), tmp_path)
     stream._process(audio[:100], 10, 0, 8, budget=2)
-    stream._process(audio[65:180], 10, 6.5, 16, budget=2)
+    # The next window starts where the app would start it.
+    begin = stream._window_begin()
+    stream._process(audio[int(begin * 10):180], 10, begin, 16, budget=2)
     # Sections may end at an earlier pause; the seam word is never lost or doubled.
     kept = " ".join(text for _, _, text in stream._segments).split()
     assert kept == [f"word{i}" for i in range(1, len(kept) + 1)] and len(kept) >= 12
