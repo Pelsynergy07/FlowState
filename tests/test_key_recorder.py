@@ -30,6 +30,16 @@ def test_key_recorder_clearing(qapp):
     assert w.text() == ""
 
 
+def test_key_recorder_resets_to_default_instead_of_clearing(qapp):
+    w = KeyRecorderWidget("alt_r", default_combo="ctrl+m")
+    assert w._clear_btn.text() == "RESET"
+    changes = []
+    w.keyChanged.connect(changes.append)
+    w._clear_btn.click()
+    assert w.text() == "ctrl+m"
+    assert changes == ["ctrl+m"]
+
+
 def test_key_recorder_captures_simple_key(qapp):
     w = KeyRecorderWidget()
     w.start_recording()

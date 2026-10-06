@@ -42,6 +42,7 @@ from ..ui.update_notifier import UpdateNotifierSignals, check_for_update_async
 from ..update_check import UpdateInfo
 from .autostart import set_launch_at_login
 from .fonts import make_font
+from ..config import ShortcutConfig
 from .key_recorder import KeyRecorderWidget
 from .theme import FONT_FAMILY, FONT_FAMILY_DISPLAY, FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background, setup_brutalist_combobox
 from .widgets import BrutalistCheckBox, StickerBadge, GeometricMotif
@@ -458,7 +459,7 @@ class SettingsWindow(QDialog):
         header_row.addWidget(reset_btn)
         layout.addLayout(header_row)
 
-        self.toggle_edit = KeyRecorderWidget(cfg.toggle)
+        self.toggle_edit = KeyRecorderWidget(cfg.toggle, default_combo=ShortcutConfig.toggle)
         layout.addWidget(
             _card(
                 _eyebrow("Hands-free dictation"),
@@ -467,7 +468,7 @@ class SettingsWindow(QDialog):
             )
         )
 
-        self.ptt_edit = KeyRecorderWidget(cfg.push_to_talk)
+        self.ptt_edit = KeyRecorderWidget(cfg.push_to_talk, default_combo=ShortcutConfig.push_to_talk)
         layout.addWidget(
             _card(
                 _eyebrow("Push to talk"),

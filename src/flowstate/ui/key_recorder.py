@@ -59,10 +59,13 @@ class KeyRecorderWidget(QWidget):
     keyChanged = Signal(str)
     textChanged = Signal(str)
 
-    def __init__(self, current_combo: str = "", parent: QWidget | None = None):
+    def __init__(self, current_combo: str = "", parent: QWidget | None = None, default_combo: str = ""):
         super().__init__(parent)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._combo: str = current_combo.strip()
+        # With a default, the second button restores it instead of leaving
+        # the action with no shortcut at all.
+        self._default_combo: str = default_combo.strip().lower()
         self._is_recording: bool = False
         self._pending_modifier: str | None = None
 
@@ -130,7 +133,9 @@ class KeyRecorderWidget(QWidget):
         self._record_btn.clicked.connect(self.start_recording)
         box_layout.addWidget(self._record_btn)
 
-        self._clear_btn = QPushButton("CLEAR")
+        self._clear_btn = QPushButton("RESET" if self._default_combo else "CLEAR")
+        if self._default_combo:
+            self._clear_btn.setToolTip(f"Back to the default: {format_hotkey_display(self._default_combo)}")
         self._clear_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._clear_btn.setStyleSheet(
             f"""
@@ -279,8 +284,9 @@ class KeyRecorderWidget(QWidget):
         self.setText(combo)
 
     def clear_combo(self) -> None:
+        """Reset to the default shortcut when there is one, else clear."""
         self.stop_recording()
-        self.setText("")
+        self.setText(self._default_combo)
 
     def start_recording(self) -> None:
         if self._is_recording:

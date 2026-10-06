@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
 
 from .. import paths
 from .fonts import make_font
+from ..config import ShortcutConfig
 from .key_recorder import KeyRecorderWidget, format_hotkey_display
 from .theme import (
     FONT_FAMILY,
@@ -638,8 +639,8 @@ class OnboardingDialog(QDialog):
         layout.addWidget(_heading("Your shortcuts"))
         layout.addWidget(_body("These work in every app. Click a shortcut to change it.", muted=True))
 
-        self.ptt_edit = KeyRecorderWidget(cfg.shortcuts.push_to_talk)
-        self.toggle_edit = KeyRecorderWidget(cfg.shortcuts.toggle)
+        self.ptt_edit = KeyRecorderWidget(cfg.shortcuts.push_to_talk, default_combo=ShortcutConfig.push_to_talk)
+        self.toggle_edit = KeyRecorderWidget(cfg.shortcuts.toggle, default_combo=ShortcutConfig.toggle)
         self.ptt_edit.keyChanged.connect(self._on_shortcut_changed)
         self.toggle_edit.keyChanged.connect(self._on_shortcut_changed)
         layout.addWidget(_card(_body("<b>Hold to talk</b> · hold while you speak, let go to paste"), self.ptt_edit,
