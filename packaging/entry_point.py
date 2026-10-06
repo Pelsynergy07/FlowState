@@ -53,6 +53,10 @@ if "--verify-runtime" in sys.argv:
     import ctranslate2, tokenizers
     from flowstate.text import guard, llm
     assert guard.preserves_words("hello there", "Hello, there.")
+    # First-run setup and the stats question must load in the frozen app.
+    from flowstate.ui import consent, onboarding
+    consent.ConsentDialog().close()
+    assert onboarding.shortcut_conflict("ctrl+m")
     from flowstate import __version__
     (root / "runtime-check.json").write_text(json.dumps({"version": __version__, "qt": qVersion(),
                                                       "tabs": window.tabs.count(), "local_stats": True}), encoding="utf-8")
