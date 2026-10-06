@@ -1,4 +1,4 @@
-"""First-time user quickstart tutorial for FlowState.
+"""First-time user quickstart tutorial for FlowState: two real dictations.
 
 Guides users through:
 1. Push-to-Talk practice with live speech transcription.
@@ -11,7 +11,6 @@ import logging
 from PySide6.QtCore import QPoint, QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QApplication,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -24,7 +23,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import paths
 from .fonts import make_font
 from .theme import (
     BORDER,
@@ -141,6 +139,11 @@ class _SpatialDemoCanvas(QFrame):
                 self.flash_warning("PRESS HOTKEY FIRST: Tap hotkey to start listening before dragging!")
                 if self.on_unauthorized_drag:
                     self.on_unauthorized_drag()
+                event.accept()
+                return
+            if not event.modifiers() & Qt.ControlModifier:
+                # FlowState captures on Ctrl+drag only; teach exactly that.
+                self.flash_warning("HOLD CTRL while you drag to capture this area")
                 event.accept()
                 return
             self._user_interacting = True
@@ -342,7 +345,7 @@ class _SpatialDemoCanvas(QFrame):
                 painter.drawText(16, 246, ">> Step 2: Now Hold Ctrl + Click & Drag across the element while talking.")
             else:
                 painter.setPen(QColor("#1A1A1A"))
-                painter.drawText(16, 246, ">> Step 3: Button captured! Tap your hotkey again to finish & paste directly into chatbot.")
+                painter.drawText(16, 246, ">> Captured! Tap your hotkey again to finish.")
 
         # 6. Animated guide demonstration
         if self._selected_rect is None and not self._user_interacting:
@@ -427,12 +430,42 @@ class _SpatialDemoCanvas(QFrame):
         painter.end()
 
 
+
+
+def _hotkey_button_style(background: str, hover: str, text: str) -> str:
+    return f"""
+        QPushButton {{
+            background-color: {background};
+            color: {text};
+            border: 2px solid #121212;
+            border-radius: 4px;
+            font-family: {FONT_FAMILY_MONO};
+            font-size: 10px;
+            font-weight: 900;
+            padding: 4px 14px;
+        }}
+        QPushButton:hover {{
+            background-color: {hover};
+        }}
+    """
+
+
+_IDLE_BUTTON = _hotkey_button_style("#121212", "#333333", "#FFFFFF")
+_ACTIVE_BUTTON = _hotkey_button_style(LIME, "#C2F01A", "#121212")
+
+
 class TutorialDialog(QDialog):
+    """Two real dictations: hold-to-talk, then hands-free with a screenshot.
+
+    Every result shown here comes from an actual recording through the
+    controller; nothing is simulated, and the clipboard is never touched
+    (the normal paste path already restores it).
+    """
+
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self._controller = controller
-        self._has_captured_snippet = False
-        self._is_step2_listening = False
+        self._recording = False
         self.setWindowTitle("FlowState Quickstart")
         self.setStyleSheet(build_stylesheet())
         self.resize(820, 700)
@@ -482,20 +515,17 @@ class TutorialDialog(QDialog):
         rule.setProperty("role", "rule")
         outer.addWidget(rule)
 
-        # 2-Step Stacked Pages
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_step1_ptt())
         self.stack.addWidget(self._build_step2_spatial())
         outer.addWidget(self.stack, 1)
 
-        # Navigation row
         nav_row = QHBoxLayout()
         self.prev_btn = QPushButton("← Back")
         self.prev_btn.setProperty("role", "secondary")
         self.prev_btn.setFixedWidth(110)
         self.prev_btn.clicked.connect(self._go_prev)
         self.prev_btn.hide()
-
         nav_row.addWidget(self.prev_btn)
         nav_row.addStretch(1)
 
@@ -504,17 +534,39 @@ class TutorialDialog(QDialog):
         self.next_btn.setMinimumWidth(180)
         self.next_btn.clicked.connect(self._go_next)
         nav_row.addWidget(self.next_btn)
-
         outer.addLayout(nav_row)
 
-        # Hook controller signals
-        if hasattr(self._controller.signals, "recording_started"):
-            self._controller.signals.recording_started.connect(self._on_recording_started)
-        self._controller.signals.recording_finished.connect(self._on_speech_transcribed)
+        # Disconnected again in done(): a closed tutorial must not keep
+        # reacting to every later dictation.
+        signals = self._controller.signals
+        self._connections = []
+        for name, slot in (("recording_started", self._on_recording_started),
+                           ("processing_started", self._on_processing_started),
+                           ("recording_finished", self._on_speech_transcribed),
+                           ("no_speech_detected", self._on_no_speech),
+                           ("error", self._on_error)):
+            signal = getattr(signals, name, None)
+            if signal is not None:
+                signal.connect(slot)
+                self._connections.append((signal, slot))
 
     def paintEvent(self, event):
         painter = QPainter(self)
         paint_paper_background(painter, self.rect())
+
+    def done(self, result: int) -> None:
+        for signal, slot in self._connections:
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+        self._connections = []
+        if self._recording:
+            # Leaving mid-recording: finish it rather than leave the mic open.
+            stop = getattr(self._controller, "stop_recording", None)
+            if stop is not None:
+                stop()
+        super().done(result)
 
     # -- Step 1: Push to Talk Practice ---------------------------------
     def _build_step1_ptt(self) -> QWidget:
@@ -524,30 +576,37 @@ class TutorialDialog(QDialog):
         layout.setSpacing(10)
 
         instr = QLabel(
-            f"Hold <b>{self.ptt_shortcut}</b>, speak the phrase below aloud, then release."
+            f"Hold <b>{self.ptt_shortcut}</b> (or the button), say the phrase below, then let go. "
+            "In any other app, the text is pasted where your cursor is."
         )
         instr.setFont(make_font(FONT_FAMILY, 9.5))
         instr.setWordWrap(True)
         layout.addWidget(instr)
 
-        # Action / Hotkey prompt row (matching Step 2 style & text)
         action_row = QHBoxLayout()
         action_row.setSpacing(10)
 
         read_badge = QLabel("READ THIS ALOUD:")
         read_badge.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
         read_badge.setStyleSheet("color: #1A1A1A; background-color: #EFE8DC; border: 1.5px solid #1A1A1A; border-radius: 3px; padding: 4px 8px;")
-        self.sample_prompt = "I swear I'm not crazy, my computer made me say this."
+        self.sample_prompt = ("Hi Sam, quick update. First, the report is done. Second, the demo moved to Friday. "
+                              "Thanks, Alex")
         read_text = QLabel(f'"{self.sample_prompt}"')
         read_text.setFont(make_font(FONT_FAMILY_DISPLAY, 13, bold=True))
         read_text.setStyleSheet("color: #1A1A1A;")
         read_text.setWordWrap(True)
         action_row.addWidget(read_badge)
-        action_row.addWidget(read_text)
-        action_row.addStretch(1)
+        action_row.addWidget(read_text, 1)
+
+        self.step1_hold_btn = QPushButton(f"HOLD TO TALK ({self.ptt_shortcut})")
+        self.step1_hold_btn.setCursor(Qt.PointingHandCursor)
+        self.step1_hold_btn.setFixedHeight(30)
+        self.step1_hold_btn.setStyleSheet(_IDLE_BUTTON)
+        self.step1_hold_btn.pressed.connect(self._hold_to_talk_pressed)
+        self.step1_hold_btn.released.connect(self._hold_to_talk_released)
+        action_row.addWidget(self.step1_hold_btn)
         layout.addLayout(action_row)
 
-        # Interactive live transcription box
         box_card = QFrame()
         box_card.setProperty("role", "card")
         bc_layout = QVBoxLayout(box_card)
@@ -555,44 +614,36 @@ class TutorialDialog(QDialog):
         bc_layout.setSpacing(6)
 
         bc_header = QHBoxLayout()
-        bc_label = QLabel("LIVE DICTATION RESULT:")
+        bc_label = QLabel("YOUR DICTATION:")
         bc_label.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
-        self.step1_success_badge = StickerBadge("SPEECH CAPTURED", bg_color=LIME, text_color="#1A1A1A", is_pill=True)
-        self.step1_success_badge.hide()
+        self.step1_success_badge = StickerBadge("WAITING FOR YOU", bg_color="#EAE4D8", text_color="#5C5751", is_pill=True)
         bc_header.addWidget(bc_label)
         bc_header.addWidget(self.step1_success_badge)
         bc_header.addStretch(1)
-
-        demo_paste_btn = QPushButton("PASTE SAMPLE")
-        demo_paste_btn.setProperty("role", "secondary")
-        demo_paste_btn.setFixedHeight(24)
-        demo_paste_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 8px; font-weight: 800; padding: 2px 8px;")
-        demo_paste_btn.clicked.connect(self._simulate_step1_press)
-        bc_header.addWidget(demo_paste_btn)
         bc_layout.addLayout(bc_header)
 
         self.step1_text = QTextEdit()
-        self.step1_text.setPlaceholderText("Transcribed text appears here automatically when you speak...")
-        self.step1_text.setFixedHeight(270)
+        self.step1_text.setReadOnly(True)
+        self.step1_text.setPlaceholderText("Your formatted text appears here after you let go...")
+        self.step1_text.setFixedHeight(220)
         self.step1_text.setFont(make_font(FONT_FAMILY, 11))
-        self.step1_text.textChanged.connect(self._on_step1_text_changed)
         bc_layout.addWidget(self.step1_text)
 
         layout.addWidget(box_card)
         layout.addStretch(1)
         return page
 
-    def _simulate_step1_press(self) -> None:
-        self.step1_text.setText(self.sample_prompt)
+    def _hold_to_talk_pressed(self) -> None:
+        start = getattr(self._controller, "start_recording", None)
+        if start is not None:
+            start(mode="ptt")
 
-    def _on_step1_text_changed(self) -> None:
-        has_text = bool(self.step1_text.toPlainText().strip())
-        if has_text:
-            self.step1_success_badge.show()
-            self.next_btn.setText("Next: Visual Highlight →")
-            self.next_btn.setEnabled(True)
+    def _hold_to_talk_released(self) -> None:
+        stop = getattr(self._controller, "stop_recording", None)
+        if stop is not None:
+            stop()
 
-    # -- Step 2: Hands-Free & Image Drag-and-Paste ----------------------
+    # -- Step 2: Hands-Free & screenshot -------------------------------
     def _build_step2_spatial(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -600,58 +651,40 @@ class TutorialDialog(QDialog):
         layout.setSpacing(10)
 
         step2_instr = QLabel(
-            f"Press <b>{self.toggle_shortcut}</b>, hold <b>Ctrl + Drag</b> over the button, then press it again to paste."
+            f"Tap <b>{self.toggle_shortcut}</b> (or the button) to start, hold <b>Ctrl</b> and drag over the "
+            "highlighted button while you talk, then tap again to finish."
         )
         step2_instr.setFont(make_font(FONT_FAMILY, 9.5))
         step2_instr.setWordWrap(True)
         layout.addWidget(step2_instr)
 
-        # Action / Hotkey prompt row
         action_row = QHBoxLayout()
         action_row.setSpacing(10)
 
         read_badge = QLabel("READ THIS ALOUD:")
         read_badge.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
         read_badge.setStyleSheet("color: #1A1A1A; background-color: #EFE8DC; border: 1.5px solid #1A1A1A; border-radius: 3px; padding: 4px 8px;")
-        read_text = QLabel('"Fix this thing"')
+        read_text = QLabel('"Fix this button, it looks misaligned"')
         read_text.setFont(make_font(FONT_FAMILY_DISPLAY, 14, bold=True))
         read_text.setStyleSheet("color: #1A1A1A;")
         action_row.addWidget(read_badge)
         action_row.addWidget(read_text)
         action_row.addStretch(1)
 
-        self.step2_hotkey_btn = QPushButton(f"TAP HOTKEY ({self.toggle_shortcut})")
+        self.step2_hotkey_btn = QPushButton(f"START ({self.toggle_shortcut})")
         self.step2_hotkey_btn.setCursor(Qt.PointingHandCursor)
         self.step2_hotkey_btn.setFixedHeight(30)
-        self.step2_hotkey_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: #121212;
-                color: #FFFFFF;
-                border: 2px solid #121212;
-                border-radius: 4px;
-                font-family: {FONT_FAMILY_MONO};
-                font-size: 10px;
-                font-weight: 900;
-                padding: 4px 14px;
-            }}
-            QPushButton:hover {{
-                background-color: #333333;
-            }}
-            """
-        )
-        self.step2_hotkey_btn.clicked.connect(self._toggle_step2_listening)
+        self.step2_hotkey_btn.setStyleSheet(_IDLE_BUTTON)
+        self.step2_hotkey_btn.clicked.connect(self._toggle_recording)
         action_row.addWidget(self.step2_hotkey_btn)
         layout.addLayout(action_row)
 
-        # Interactive Dashboard Canvas (235px tall, no empty gap below!)
         self.demo_canvas = _SpatialDemoCanvas(
             on_selected=self._on_spatial_selected,
             on_unauthorized_drag=self._on_unauthorized_drag,
         )
         layout.addWidget(self.demo_canvas)
 
-        # Combined Target: Captured snippet thumbnail + Text Box
         target_card = QFrame()
         target_card.setProperty("role", "card")
         tc_layout = QVBoxLayout(target_card)
@@ -659,25 +692,14 @@ class TutorialDialog(QDialog):
         tc_layout.setSpacing(6)
 
         tc_header = QHBoxLayout()
-        tc_label = QLabel("CAPTURED CONTEXT & TRANSCRIPTION:")
+        tc_label = QLabel("WHAT GETS PASTED:")
         tc_label.setFont(make_font(FONT_FAMILY_MONO, 8, bold=True))
         tc_header.addWidget(tc_label)
-
-        self.step2_badge = StickerBadge("WAITING FOR HOTKEY...", bg_color="#EAE4D8", text_color="#5C5751", is_pill=True)
+        self.step2_badge = StickerBadge("WAITING FOR YOU", bg_color="#EAE4D8", text_color="#5C5751", is_pill=True)
         tc_header.addWidget(self.step2_badge)
-
         tc_header.addStretch(1)
-
-        demo_paste_btn = QPushButton("PASTE SAMPLE")
-        demo_paste_btn.setProperty("role", "secondary")
-        demo_paste_btn.setFixedHeight(24)
-        demo_paste_btn.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 8px; font-weight: 800; padding: 2px 8px;")
-        demo_paste_btn.clicked.connect(self._fill_step2_sample)
-        tc_header.addWidget(demo_paste_btn)
-
         tc_layout.addLayout(tc_header)
 
-        # Preview row with thumbnail + compact text box
         content_row = QHBoxLayout()
         content_row.setSpacing(10)
 
@@ -688,223 +710,72 @@ class TutorialDialog(QDialog):
         content_row.addWidget(self.thumbnail_label)
 
         self.step2_text = QTextEdit()
+        self.step2_text.setReadOnly(True)
         self.step2_text.setFont(make_font(FONT_FAMILY, 9.5))
-        self.step2_text.setPlaceholderText("Transcribed thought & screenshot appear here when hotkey is pressed again...")
-        self.step2_text.setFixedHeight(42)
-        self.step2_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.step2_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.step2_text.setPlaceholderText("Your text and screenshot reference appear here when you finish...")
+        self.step2_text.setFixedHeight(64)
         self.step2_text.setStyleSheet("QTextEdit { padding: 6px 10px; border: 1.5px solid #1A1A1A; border-radius: 3px; background-color: #FFFFFF; }")
         content_row.addWidget(self.step2_text, 1)
 
         tc_layout.addLayout(content_row)
-
         layout.addWidget(target_card)
         layout.addStretch(1)
         return page
 
-    def _toggle_step2_listening(self) -> None:
-        self._is_step2_listening = not self._is_step2_listening
-        if self._is_step2_listening:
-            # 1. Start listening state
-            self.demo_canvas.listening_active = True
-            self.step2_hotkey_btn.setText(f"STOP HOTKEY ({self.toggle_shortcut})")
-            self.step2_hotkey_btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    background-color: {LIME};
-                    color: #121212;
-                    border: 2px solid #121212;
-                    border-radius: 4px;
-                    font-family: {FONT_FAMILY_MONO};
-                    font-size: 10px;
-                    font-weight: 900;
-                    padding: 4px 14px;
-                }}
-                QPushButton:hover {{
-                    background-color: #C2F01A;
-                }}
-                """
-            )
-            self.step2_badge.setText("LISTENING... Speak & Hold Ctrl+Drag")
-            self.step2_badge.setColors(LIME, "#121212")
-            self.step2_badge.show()
-        else:
-            # 2. Stop listening and paste into context box & clipboard
-            self.demo_canvas.listening_active = False
-            self.step2_hotkey_btn.setText(f"TAP HOTKEY ({self.toggle_shortcut})")
-            self.step2_hotkey_btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    background-color: #121212;
-                    color: #FFFFFF;
-                    border: 2px solid #121212;
-                    border-radius: 4px;
-                    font-family: {FONT_FAMILY_MONO};
-                    font-size: 10px;
-                    font-weight: 900;
-                    padding: 4px 14px;
-                }}
-                QPushButton:hover {{
-                    background-color: #333333;
-                }}
-                """
-            )
-            if not self._has_captured_snippet:
-                pixmap = self.demo_canvas.grab_broken_button()
-                self._on_spatial_selected(self.demo_canvas.broken_button_rect, pixmap)
-            final_text = "Fix this thing"
-            self.step2_text.setText(final_text)
-            QApplication.clipboard().setText(final_text)
-            self.step2_badge.setText("PASTED INTO CHATBOT")
-            self.step2_badge.setColors(LIME, "#121212")
-            self.step2_badge.show()
-            self.next_btn.setText("Open FlowState →")
-            self.next_btn.setEnabled(True)
+    def _toggle_recording(self) -> None:
+        toggle = getattr(self._controller, "toggle_recording", None)
+        if toggle is not None:
+            toggle()
 
     def _on_unauthorized_drag(self) -> None:
-        self.step2_badge.setText(f"TAP {self.toggle_shortcut} FIRST!")
-        self.step2_badge.setColors("#FFF3BF", "#C92A2A")
-        self.step2_badge.show()
+        self._set_status(f"TAP {self.toggle_shortcut} FIRST", "warn")
 
     def _on_spatial_selected(self, rect: QRect, pixmap: QPixmap) -> None:
-        self._has_captured_snippet = True
         scaled = pixmap.scaled(95, 42, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.thumbnail_label.setPixmap(scaled)
         self.thumbnail_label.setStyleSheet("border: 1.5px solid #1A1A1A; background-color: #FFFFFF;")
-        if self._is_step2_listening:
-            self.step2_badge.setText(f"CAPTURED! Tap {self.toggle_shortcut} to finish & paste")
-            self.step2_badge.setColors(LIME, "#121212")
+        self._set_status(f"CAPTURED · TAP {self.toggle_shortcut} TO FINISH", "good")
+
+    # -- Live status from real recordings --------------------------------
+    def _set_status(self, text: str, tone: str) -> None:
+        colors = {"idle": ("#EAE4D8", "#5C5751"), "good": (LIME, "#121212"), "warn": ("#FFF3BF", "#C92A2A")}
+        badge = self.step1_success_badge if self.stack.currentIndex() == 0 else self.step2_badge
+        badge.setText(text)
+        badge.setColors(*colors[tone])
+        badge.show()
+
+    def _set_recording(self, recording: bool) -> None:
+        self._recording = recording
+        self.demo_canvas.listening_active = recording and self.stack.currentIndex() == 1
+        if self.stack.currentIndex() == 1:
+            self.step2_hotkey_btn.setText(f"{'FINISH' if recording else 'START'} ({self.toggle_shortcut})")
+            self.step2_hotkey_btn.setStyleSheet(_ACTIVE_BUTTON if recording else _IDLE_BUTTON)
         else:
-            self.step2_badge.setText("COPIED & PASTED")
-            self.step2_badge.setColors(LIME, "#121212")
-        self.step2_badge.show()
-
-    def _handle_step2_hotkey_paste(self) -> None:
-        if not self._is_step2_listening:
-            self._toggle_step2_listening()  # start listening
-        self._toggle_step2_listening()  # finish listening and paste
-
-    def _fill_step2_sample(self) -> None:
-        if not self._has_captured_snippet:
-            pixmap = self.demo_canvas.grab_broken_button()
-            self._on_spatial_selected(self.demo_canvas.broken_button_rect, pixmap)
-        self._is_step2_listening = False
-        self.demo_canvas.listening_active = False
-        self.step2_hotkey_btn.setText(f"TAP HOTKEY ({self.toggle_shortcut})")
-        self.step2_hotkey_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: #121212;
-                color: #FFFFFF;
-                border: 2px solid #121212;
-                border-radius: 4px;
-                font-family: {FONT_FAMILY_MONO};
-                font-size: 10px;
-                font-weight: 900;
-                padding: 4px 14px;
-            }}
-            QPushButton:hover {{
-                background-color: #333333;
-            }}
-            """
-        )
-        self.step2_text.setText("Fix this thing")
-        QApplication.clipboard().setText("Fix this thing")
-        self.step2_badge.setText("PASTED INTO CHATBOT")
-        self.step2_badge.setColors(LIME, "#121212")
-        self.step2_badge.show()
-        self.next_btn.setText("Open FlowState →")
-        self.next_btn.setEnabled(True)
+            self.step1_hold_btn.setStyleSheet(_ACTIVE_BUTTON if recording else _IDLE_BUTTON)
 
     def _on_recording_started(self) -> None:
-        if self.stack.currentIndex() == 1:
-            self._is_step2_listening = True
-            self.demo_canvas.listening_active = True
-            self.step2_hotkey_btn.setText(f"STOP HOTKEY ({self.toggle_shortcut})")
-            self.step2_hotkey_btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    background-color: {LIME};
-                    color: #121212;
-                    border: 2px solid #121212;
-                    border-radius: 4px;
-                    font-family: {FONT_FAMILY_MONO};
-                    font-size: 10px;
-                    font-weight: 900;
-                    padding: 4px 14px;
-                }}
-                QPushButton:hover {{
-                    background-color: #C2F01A;
-                }}
-                """
-            )
-            self.step2_badge.setText("LISTENING... Speak & Hold Ctrl+Drag")
-            self.step2_badge.setColors(LIME, "#121212")
-            self.step2_badge.show()
+        self._set_recording(True)
+        self._set_status("LISTENING…" if self.stack.currentIndex() == 0 else "LISTENING · CTRL+DRAG THE BUTTON", "good")
+
+    def _on_processing_started(self) -> None:
+        self._set_recording(False)
+        self._set_status("FORMATTING…", "idle")
 
     def _on_speech_transcribed(self, text: str) -> None:
-        if self.stack.currentIndex() == 0:
-            if text:
-                self.step1_text.setText(text.strip())
-        elif self.stack.currentIndex() == 1:
-            self._is_step2_listening = False
-            self.demo_canvas.listening_active = False
-            self.step2_hotkey_btn.setText(f"TAP HOTKEY ({self.toggle_shortcut})")
-            self.step2_hotkey_btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    background-color: #121212;
-                    color: #FFFFFF;
-                    border: 2px solid #121212;
-                    border-radius: 4px;
-                    font-family: {FONT_FAMILY_MONO};
-                    font-size: 10px;
-                    font-weight: 900;
-                    padding: 4px 14px;
-                }}
-                QPushButton:hover {{
-                    background-color: #333333;
-                }}
-                """
-            )
-            if not self._has_captured_snippet:
-                pixmap = self.demo_canvas.grab_broken_button()
-                self._on_spatial_selected(self.demo_canvas.broken_button_rect, pixmap)
-            final_text = text.strip() if text and text.strip() else "Fix this thing"
-            self.step2_text.setText(final_text)
-            QApplication.clipboard().setText(final_text)
-            self.step2_badge.setText("PASTED INTO CHATBOT")
-            self.step2_badge.setColors(LIME, "#121212")
-            self.step2_badge.show()
-            self.next_btn.setText("Open FlowState →")
-            self.next_btn.setEnabled(True)
+        self._set_recording(False)
+        if not text or not text.strip():
+            return
+        target = self.step1_text if self.stack.currentIndex() == 0 else self.step2_text
+        target.setPlainText(text.strip())
+        self._set_status("DONE · THIS IS WHAT GETS PASTED", "good")
 
-    def keyPressEvent(self, event):
-        modifiers = event.modifiers()
-        key = event.key()
+    def _on_no_speech(self) -> None:
+        self._set_recording(False)
+        self._set_status("DIDN'T HEAR ANYTHING · CHECK YOUR MIC AND TRY AGAIN", "warn")
 
-        is_toggle = (
-            (modifiers & Qt.ControlModifier)
-            and (modifiers & Qt.ShiftModifier)
-            and key == Qt.Key_Space
-        )
-        is_ptt = (
-            (modifiers & Qt.ControlModifier)
-            and not (modifiers & Qt.ShiftModifier)
-            and key == Qt.Key_M
-        )
-
-        if is_toggle or is_ptt:
-            if self.stack.currentIndex() == 1:
-                self._toggle_step2_listening()
-                event.accept()
-                return
-            elif self.stack.currentIndex() == 0:
-                self.step1_text.setText(self.sample_prompt)
-                event.accept()
-                return
-
-        super().keyPressEvent(event)
+    def _on_error(self, _message: str) -> None:
+        self._set_recording(False)
+        self._set_status("SOMETHING WENT WRONG · TRY AGAIN", "warn")
 
     # -- Navigation logic ----------------------------------------------
     def _go_next(self) -> None:
@@ -917,9 +788,7 @@ class TutorialDialog(QDialog):
             self.next_btn.setText("Open FlowState →")
             self.next_btn.adjustSize()
         elif idx == 1:
-            # Mark first run complete!
-            paths.first_run_flag_path().write_text("done", encoding="utf-8")
-            logger.info("First-run tutorial completed. Flag saved.")
+            logger.info("First-run tutorial completed.")
             self.accept()
 
     def _go_prev(self) -> None:
@@ -931,4 +800,3 @@ class TutorialDialog(QDialog):
             self.prev_btn.hide()
             self.next_btn.setText("Next: Visual Highlight →")
             self.next_btn.adjustSize()
-

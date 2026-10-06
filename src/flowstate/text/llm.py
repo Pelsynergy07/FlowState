@@ -101,36 +101,55 @@ def cuda_device_available() -> bool:
         return False
 
 
-def cuda_free_bytes() -> int | None:
-    """Free memory on GPU 0 via NVML (ships with every NVIDIA driver)."""
+def _nvml_query(query):
+    """Run query(nvml, handle) against GPU 0 via NVML, which ships with every
+    NVIDIA driver. None when there is no NVIDIA driver or the call fails."""
     try:
         nvml = ctypes.WinDLL("nvml.dll") if hasattr(ctypes, "WinDLL") else ctypes.CDLL("libnvidia-ml.so.1")
     except OSError:
         return None
-
-    class Memory(ctypes.Structure):
-        _fields_ = [("total", ctypes.c_ulonglong), ("free", ctypes.c_ulonglong), ("used", ctypes.c_ulonglong)]
-
     try:
         if nvml.nvmlInit_v2() != 0:
             return None
         try:
             handle = ctypes.c_void_p()
-            memory = Memory()
             if nvml.nvmlDeviceGetHandleByIndex_v2(0, ctypes.byref(handle)) != 0:
                 return None
-            if nvml.nvmlDeviceGetMemoryInfo(handle, ctypes.byref(memory)) != 0:
-                return None
-            return int(memory.free)
+            return query(nvml, handle)
         finally:
             nvml.nvmlShutdown()
     except Exception:
         return None
 
 
-def preferred_model(device_preference: str = "auto") -> FormatterModel:
+def cuda_free_bytes() -> int | None:
+    """Free memory on GPU 0."""
+    class Memory(ctypes.Structure):
+        _fields_ = [("total", ctypes.c_ulonglong), ("free", ctypes.c_ulonglong), ("used", ctypes.c_ulonglong)]
+
+    def query(nvml, handle):
+        memory = Memory()
+        return int(memory.free) if nvml.nvmlDeviceGetMemoryInfo(handle, ctypes.byref(memory)) == 0 else None
+
+    return _nvml_query(query)
+
+
+def cuda_device_name() -> str | None:
+    """Marketing name of GPU 0, e.g. "NVIDIA GeForce RTX 2070"."""
+    def query(nvml, handle):
+        name = ctypes.create_string_buffer(96)
+        if nvml.nvmlDeviceGetName(handle, name, ctypes.c_uint(96)) != 0:
+            return None
+        return name.value.decode("utf-8", "replace").strip() or None
+
+    return _nvml_query(query)
+
+
+def preferred_model(device_preference: str = "auto", cuda_available: bool | None = None) -> FormatterModel:
     """Which formatter this machine should download and run."""
-    if device_preference != "cpu" and cuda_device_available():
+    if device_preference == "cpu":
+        return CPU_MODEL
+    if cuda_available if cuda_available is not None else cuda_device_available():
         return CUDA_MODEL
     return CPU_MODEL
 

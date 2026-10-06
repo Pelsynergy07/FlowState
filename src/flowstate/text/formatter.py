@@ -131,8 +131,12 @@ class SmartFormatter:
     def is_model_cached() -> bool:
         return llm.is_cached(llm.CUDA_MODEL) or llm.is_cached(llm.CPU_MODEL)
 
-    def target_model(self) -> llm.FormatterModel:
-        return llm.preferred_model(self.device_preference)
+    def clear_load_failure(self) -> None:
+        """Allow another load attempt after a failed one (a user retrying setup)."""
+        self._load_failed = False
+
+    def target_model(self, cuda_available: bool | None = None) -> llm.FormatterModel:
+        return llm.preferred_model(self.device_preference, cuda_available)
 
     def preload(self, allow_download: bool = True) -> bool:
         """Load the model now (off the UI thread). Returns True on success."""

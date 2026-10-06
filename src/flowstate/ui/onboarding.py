@@ -5,7 +5,7 @@ background model preload with continuous activity spinner and live ETA.
 from __future__ import annotations
 
 import logging
-import subprocess
+import shutil
 from pathlib import Path
 from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
@@ -47,31 +47,56 @@ from .widgets import ActivitySpinner, GeometricMotif, StickerBadge
 logger = logging.getLogger("flowstate.onboarding")
 
 
-def _detect_hardware_summary() -> tuple[str, str, bool, int]:
-    """Returns (hardware_title, detail_text, is_gpu, core_count)."""
-    import os
-    cores = os.cpu_count() or 4
+def _cpu_name() -> str:
+    """Readable processor name, e.g. "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"."""
     try:
-        import ctranslate2
-        if ctranslate2.get_cuda_device_count() > 0:
-            try:
-                res = subprocess.run(
-                    ["powershell", "-Command", "(Get-CimInstance Win32_VideoController | Where-Object { $_.Name -like '*NVIDIA*' }).Name"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                )
-                gpu = res.stdout.strip().split("\n")[0].strip()
-                if gpu:
-                    return gpu, "Dedicated GPU (CUDA 12.x Accelerated)", True, cores
-            except Exception:
-                pass
-            return "NVIDIA GPU", "Dedicated GPU (CUDA 12.x Accelerated)", True, cores
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+            return " ".join(str(winreg.QueryValueEx(key, "ProcessorNameString")[0]).split())
+    except Exception:
+        import platform
+
+        return platform.processor() or "Your processor"
+
+
+def _detect_hardware_summary() -> tuple[str, str, bool, int]:
+    """Returns (hardware_title, detail_text, is_gpu, core_count).
+
+    Asks the NVIDIA driver directly (milliseconds) rather than importing
+    the CUDA runtime (seconds): the window must appear immediately. The
+    models themselves still verify CUDA when they load.
+    """
+    import os
+    from ..text import llm
+
+    cores = os.cpu_count() or 4
+    gpu = llm.cuda_device_name()
+    if gpu:
+        return gpu, "NVIDIA graphics card", True, cores
+    return _cpu_name(), f"Processor ({cores} threads)", False, cores
+
+
+def _missing_download_mb(controller, is_gpu: bool) -> int:
+    """Approximate size of the models this machine still has to download."""
+    total = 0
+    try:
+        from ..asr.engine import _find_model_dir
+
+        spec = controller._asr.resolve_target_model(cuda_available=is_gpu)
+        if _find_model_dir(paths.models_dir() / spec.id) is None:
+            total += spec.approx_size_mb
     except Exception:
         pass
-    import platform
-    cpu = platform.processor() or "Multi-Core CPU"
-    return cpu, f"Standard CPU Mode ({cores} Cores)", False, cores
+    try:
+        from ..text import llm
+
+        model = controller._pipeline._formatter.target_model(cuda_available=is_gpu)
+        if not llm.is_cached(model):
+            total += model.approx_size_mb
+    except Exception:
+        pass
+    return total
 
 
 class _PreloadWorker(QObject):
@@ -87,6 +112,8 @@ class _PreloadWorker(QObject):
         self._hw_name = hw_name
         self._is_gpu = is_gpu
         self._cores = cores
+        # Each download fills its own slice of one continuous 0-100% bar.
+        self._range = (0, 100)
 
     def run(self) -> None:
         import threading
@@ -112,6 +139,7 @@ class _PreloadWorker(QObject):
                 return
 
             # 1. Download Whisper Turbo speech model
+            self._range = (0, 45)
             self._download_asr()
 
             # 2. Compile Whisper weights into memory/VRAM with real-time heartbeat
@@ -119,7 +147,7 @@ class _PreloadWorker(QObject):
             dev_type = "GPU VRAM" if self._is_gpu else "System RAM"
             self.status.emit(f"Setting up speech recognition engine...")
             self.telemetry.emit(f"Initializing voice models on {self._hw_name} (est. ~{est_time})...")
-            self.progress.emit(50)
+            self.progress.emit(47)
 
             stop_compile = threading.Event()
 
@@ -147,6 +175,8 @@ class _PreloadWorker(QObject):
             self.telemetry.emit(f"Voice recognition initialized successfully.")
 
             # 3. Download Qwen 1.5B text-formatting model
+            self._range = (50, 92)
+            self.progress.emit(50)
             self._download_formatter()
 
             # 4. Initialize formatting model into memory
@@ -183,8 +213,8 @@ class _PreloadWorker(QObject):
         self.finished.emit()
 
     def _on_download_progress(self, pct, current_bytes=0, total_bytes=0, speed=0.0, eta=None):
-        # Map download 0-100 to progress 0-50 for step 1, 50-95 for step 2
-        self.progress.emit(pct)
+        low, high = self._range
+        self.progress.emit(low + pct * (high - low) // 100)
         if total_bytes > 0:
             mb_cur = current_bytes / (1024 * 1024)
             mb_tot = total_bytes / (1024 * 1024)
@@ -247,6 +277,9 @@ class OnboardingDialog(QDialog):
         cfg = controller.config_store.config
         self.hw_name, self.hw_detail, self.is_gpu, self.cores = _detect_hardware_summary()
         self.skipped = False
+        # True once both models are downloaded and loaded; otherwise the app
+        # finishes preparing them in the background after this dialog.
+        self.models_ready = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 20, 24, 18)
@@ -291,9 +324,10 @@ class OnboardingDialog(QDialog):
         hw_lbl.setWordWrap(True)
 
         if self.is_gpu:
-            hw_desc = f"{self.hw_detail} • CUDA accelerated for instant real-time dictation."
+            hw_desc = "Dictation runs on your graphics card for the fastest results."
         else:
-            hw_desc = f"{self.hw_detail} • Standard CPU Mode (AVX2). Initial warmup may take a moment, then runs smoothly."
+            hw_desc = ("No NVIDIA graphics card found, so FlowState uses a smaller speech model on your "
+                       "processor. It works fully offline; formatting just takes a little longer.")
 
         hw_sub = QLabel(hw_desc)
         hw_sub.setFont(make_font(FONT_FAMILY, 9))
@@ -380,8 +414,12 @@ class OnboardingDialog(QDialog):
         f_layout.addLayout(
             _make_bullet("[ 02 ]", f"Hands-Free ({cfg.shortcuts.toggle}):", "Tap to speak, tap again to paste.")
         )
-        f_layout.addLayout(_make_bullet("[ 03 ]", "Highlight (Ctrl+Drag):", "Select any area on your screen."))
-        f_layout.addLayout(_make_bullet("[ 04 ]", "AI Polish:", "Auto-cleans grammar and structure."))
+        capture_hint = {"drag": ("Screenshot (Ctrl+Drag):", "Select any area while you speak."),
+                        "circle": ("Screenshot (circle it):", "Draw a loop around anything while you speak.")}
+        if cfg.capture.mode in capture_hint:
+            f_layout.addLayout(_make_bullet("[ 03 ]", *capture_hint[cfg.capture.mode]))
+        f_layout.addLayout(_make_bullet(f"[ 0{f_layout.count() + 1} ]", "Smart formatting:",
+                                        "Punctuation, emails and lists, in your own words."))
         outer.addWidget(features_card)
 
         # 4. Status & Telemetry section
@@ -398,7 +436,7 @@ class OnboardingDialog(QDialog):
         self.spinner.hide()
         status_header_row.addWidget(self.spinner)
 
-        self.status_label = QLabel("Click below to prepare your offline speech engine and start.")
+        self.status_label = QLabel(self._intro_text(controller, self.is_gpu))
         self.status_label.setFont(make_font(FONT_FAMILY, 10, bold=True))
         self.status_label.setWordWrap(True)
         status_header_row.addWidget(self.status_label, 1)
@@ -451,6 +489,22 @@ class OnboardingDialog(QDialog):
         painter = QPainter(self)
         paint_paper_background(painter, self.rect())
 
+    @staticmethod
+    def _intro_text(controller, is_gpu: bool) -> str:
+        """Say what will be downloaded before anything is."""
+        needed_mb = _missing_download_mb(controller, is_gpu)
+        if not needed_mb:
+            return "Click below to load the speech and formatting models and start."
+        text = (f"FlowState will download its speech and formatting models (about {needed_mb / 1024:.1f} GB) "
+                "from Hugging Face. This happens once; after that everything runs offline.")
+        try:
+            free_mb = shutil.disk_usage(paths.models_dir()).free // (1024 * 1024)
+            if free_mb < needed_mb + 500:
+                text += f" Only {free_mb / 1024:.1f} GB is free on this drive, so please make room first."
+        except OSError:
+            pass
+        return text
+
     def _sync_window_size(self) -> None:
         """Automatically expand dialog height if dynamic contents need more space."""
         self.updateGeometry()
@@ -484,6 +538,11 @@ class OnboardingDialog(QDialog):
         self._sync_window_size()
 
     def _start_setup(self) -> None:
+        # A retry must actually retry, not replay the previous failure.
+        for component in (getattr(self._controller, "_asr", None),
+                          getattr(getattr(self._controller, "_pipeline", None), "_formatter", None)):
+            if component is not None and hasattr(component, "clear_load_failure"):
+                component.clear_load_failure()
         self.start_btn.setEnabled(False)
         self.start_btn.setText("Setting Things Up...")
         self.skip_btn.setEnabled(False)
@@ -508,6 +567,7 @@ class OnboardingDialog(QDialog):
         self._thread.start()
 
     def _on_finished(self) -> None:
+        self.models_ready = True
         self.spinner.hide()
         self.status_label.setText("FlowState is ready for instant dictation!")
         self.telemetry_label.setText("Everything is installed and ready to go.")
@@ -515,18 +575,28 @@ class OnboardingDialog(QDialog):
         self._sync_window_size()
         self.start_btn.setText("Open FlowState && Start Tutorial →")
         self.start_btn.setEnabled(True)
-        self.skip_btn.setEnabled(True)
+        # Nothing left to skip; it would only skip the tutorial.
+        self.skip_btn.hide()
         self.start_btn.clicked.disconnect()
         self.start_btn.clicked.connect(self.accept)
 
     def _on_failed(self, message: str) -> None:
         self.spinner.hide()
-        self.status_label.setText("Preload encountered a network notice, but FlowState can still launch.")
+        self.progress.hide()
+        network = any(marker in message for marker in (
+            "Connection", "Timeout", "Max retries", "getaddrinfo", "NameResolution", "internet connection"))
+        if network:
+            self.status_label.setText("Setup couldn't finish: FlowState couldn't reach the model download "
+                                      "server. Check your internet connection and try again.")
+        else:
+            self.status_label.setText("Setup couldn't finish preparing the models. Try again, or continue "
+                                      "and FlowState will keep trying in the background.")
         self.telemetry_label.setText(f"Details: {message}")
         self._sync_window_size()
-        self.start_btn.setText("Open FlowState Anyway →")
+        self.start_btn.setText("Try Again")
         self.start_btn.setEnabled(True)
-        self.skip_btn.setEnabled(True)
         self.start_btn.clicked.disconnect()
-        self.start_btn.clicked.connect(self.accept)
+        self.start_btn.clicked.connect(self._start_setup)
+        self.skip_btn.setText("Continue Without It")
+        self.skip_btn.setEnabled(True)
 

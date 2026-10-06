@@ -138,12 +138,15 @@ class TranscriptionEngine:
     def active_model_id(self) -> str | None:
         return self._active_model_id
 
-    def resolve_target_model(self) -> models.ModelSpec:
+    def resolve_target_model(self, cuda_available: bool | None = None) -> models.ModelSpec:
         """Which model _load() would pick right now, without loading or
         downloading anything -- lets a caller (onboarding) pre-download
-        with real progress before the actual, blocking load happens."""
+        with real progress before the actual, blocking load happens.
+        cuda_available skips the (slow to import) CUDA probe when known."""
+        if cuda_available is None and self._device_preference == "auto":
+            cuda_available = self._probe_cuda()
         want_cuda = self._device_preference == "cuda" or (
-            self._device_preference == "auto" and self._probe_cuda()
+            self._device_preference == "auto" and cuda_available
         )
         if want_cuda:
             model_id = self._requested_model_id
@@ -194,6 +197,10 @@ class TranscriptionEngine:
                 self._last_failure_time = time.time()
                 self._load_failure = self._describe_load_error(exc)
                 raise RuntimeError(self._load_failure) from exc
+
+    def clear_load_failure(self) -> None:
+        """Allow an immediate retry (a user clicking Try Again) despite the cooldown."""
+        self._load_failure = None
 
     @staticmethod
     def _describe_load_error(exc: Exception) -> str:

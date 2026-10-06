@@ -1,4 +1,11 @@
+import os
+
 import pytest
+
+# Tests never show windows or touch the real Windows clipboard: the offscreen
+# platform has its own in-process clipboard. Must be set before any
+# QApplication is created.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 class FakeBackend:
@@ -20,6 +27,13 @@ class FakeBackend:
         if isinstance(reply, Exception):
             raise reply
         yield from (reply if isinstance(reply, list) else [reply])
+
+
+@pytest.fixture(autouse=True)
+def isolated_app_data(monkeypatch, tmp_path):
+    """Tests never read or write the real %LOCALAPPDATA%\\FlowState (config,
+    first-run flag, sessions, models)."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "LocalAppData"))
 
 
 @pytest.fixture(autouse=True)

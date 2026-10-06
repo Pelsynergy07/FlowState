@@ -50,6 +50,7 @@ class ControllerSignals(QObject):
     no_speech_detected = Signal()
     error = Signal(str)
     usage_updated = Signal()
+    models_ready = Signal(bool)  # background warmup finished; True if speech recognition loaded
     drag_selection_started = Signal(int, int)
     drag_selection_moved = Signal(int, int)
     drag_selection_ended = Signal()
@@ -125,14 +126,17 @@ class RecordingController:
         threading.Thread(target=self._warmup, daemon=True).start()
 
     def _warmup(self) -> None:
+        speech_ready = False
         try:
             self._asr._load()
+            speech_ready = True
         except Exception:
             logger.warning("ASR warmup failed", exc_info=True)
         try:
             self._pipeline.preload()
         except Exception:
             logger.warning("Formatting model warmup failed", exc_info=True)
+        self.signals.models_ready.emit(speech_ready)
 
     def stop(self) -> None:
         if self._usage is not None:

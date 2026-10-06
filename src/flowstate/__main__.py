@@ -260,15 +260,36 @@ def main() -> int:
         from .ui.tutorial import TutorialDialog
         onboarding = OnboardingDialog(controller)
         onboarding.exec()
-        if onboarding.skipped:
-            paths.first_run_flag_path().write_text("done", encoding="utf-8")
-            logger.info("User skipped onboarding. Opening settings directly.")
-            QTimer.singleShot(150, open_settings)
-        else:
-            tutorial = TutorialDialog(controller)
-            tutorial.exec()
-            logger.info("Scheduling initial open_settings() after tutorial completion")
-            QTimer.singleShot(200, open_settings)
+        if not onboarding.skipped and onboarding.models_ready:
+            TutorialDialog(controller).exec()
+        # However setup ended (finished, skipped, failed or closed), it must
+        # not reappear on every launch. Settings > About can run it again.
+        paths.first_run_flag_path().write_text("done", encoding="utf-8")
+        if not onboarding.models_ready:
+            # Skipped or failed: prepare the models in the background now,
+            # instead of the first dictation silently starting a download.
+            def _announce_ready(speech_ready: bool) -> None:
+                controller.signals.models_ready.disconnect(_announce_ready)
+                if QSystemTrayIcon.isSystemTrayAvailable():
+                    tray.tray_icon.showMessage(
+                        "FlowState",
+                        "FlowState is ready. Press your hotkey to dictate." if speech_ready else
+                        "FlowState couldn't download its speech model. Check your connection, "
+                        "then use Settings > About > Run setup again.",
+                        QSystemTrayIcon.Information if speech_ready else QSystemTrayIcon.Warning,
+                        5000,
+                    )
+            controller.signals.models_ready.connect(_announce_ready)
+            controller.warmup_async()
+            if QSystemTrayIcon.isSystemTrayAvailable():
+                tray.tray_icon.showMessage(
+                    "FlowState",
+                    "Downloading the speech and formatting models in the background (about 3 GB). "
+                    "You'll get a notification when FlowState is ready.",
+                    QSystemTrayIcon.Information,
+                    5000,
+                )
+        QTimer.singleShot(200, open_settings)
     elif "--autostart" not in sys.argv:
         # If user opened the app explicitly (not silent boot startup), show settings!
         logger.info("Scheduling initial open_settings()")

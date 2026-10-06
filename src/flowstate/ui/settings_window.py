@@ -311,6 +311,24 @@ class SettingsWindow(QDialog):
         self.accept()
         restart_flowstate()
 
+    def _rerun_setup(self) -> None:
+        """Show first-run setup again (model download, microphone, tutorial)."""
+        if self._controller is not None and (self._controller.is_recording or self._controller.is_processing):
+            QMessageBox.information(self, "FlowState", "Finish recording and processing first.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Run setup again",
+            "FlowState will restart and show setup again. Your settings, history and "
+            "downloaded models are kept.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        paths.first_run_flag_path().unlink(missing_ok=True)
+        self._restart_app()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         paint_paper_background(painter, self.rect())
@@ -943,6 +961,14 @@ class SettingsWindow(QDialog):
         )
         self._check_update_btn.clicked.connect(self._manual_check_updates)
         ver_row.addWidget(self._check_update_btn)
+
+        rerun_setup_btn = QPushButton("RUN SETUP AGAIN")
+        rerun_setup_btn.setProperty("role", "secondary")
+        rerun_setup_btn.setStyleSheet(
+            f"font-family: {FONT_FAMILY_MONO}; font-size: 10px; font-weight: 900; padding: 5px 12px;"
+        )
+        rerun_setup_btn.clicked.connect(self._rerun_setup)
+        ver_row.addWidget(rerun_setup_btn)
         update_card_layout.addLayout(ver_row)
 
         # Status text & Install button container
