@@ -8,9 +8,14 @@ _MARKER = re.compile(
     r"(?P<bullet>bullet point|next bullet)\b|"
     r"(?m:^[ \t]*(?P<rendered_bullet>[-*])[ \t]+)|"
     r"(?P<next>next[,\s]+(?:one|item|point)(?:\s+is(?:\s+that)?)?)\b|"
-    r"(?P<number>number\s+(?P<number_value>one|two|three|four|five|six|seven|eight|nine|ten|\d+))\b|"
+    r"(?P<number>number\s+(?P<number_value>one|two|three|four|five|six|seven|eight|nine|ten|\d+))\b"
+    r"(?:,?\s+is\b(?:\s+that\b|(?!\s+(?:it|there|this|he|she)\b)))?|"
+    # "first is water bottle", "second one is pencil", "third, is that ...":
+    # the spoken "is" belongs to the cue, not the item. A question such as
+    # "first, is it working?" keeps its "is".
     r"(?P<ordinal>first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b"
-    r"(?:\s+(?P<item>one|item)(?:\s+is)?)?|"
+    r"(?:\s+(?P<item>one|item))?"
+    r"(?:,?\s+is\b(?:\s+that\b|(?!\s+(?:it|there|this|he|she)\b)))?|"
     r"(?P<digit>\d{1,2})\.(?=\s+\S))[,.:]?\s*",
     re.IGNORECASE,
 )
@@ -21,6 +26,24 @@ _ORDINALS = {word: index for index, word in enumerate(
 _NUMBERS = {word: index for index, word in enumerate(
     ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"), 1
 )}
+
+
+def _marker_value(marker: re.Match) -> int | None:
+    """1 for "first"/"number one"/"1.", 2 for "second", ...; None for bullets."""
+    value = (marker.group("ordinal") or marker.group("number_value") or marker.group("digit") or "").lower()
+    if not value:
+        return None
+    return _ORDINALS.get(value, _NUMBERS.get(value, int(value) if value.isdigit() else None))
+
+
+_NOT_A_CUE_BEFORE = re.compile(
+    r"\b(?:the|a|an|my|our|your|his|her|their|its|this|of|january|february|march|april|may|june|july|"
+    r"august|september|october|november|december)\s+$", re.IGNORECASE)
+
+
+def _adjectival_ordinal(text: str, marker: re.Match) -> bool:
+    """"May first", "the first meeting", "my second try": not list cues."""
+    return bool(marker.group("ordinal")) and bool(_NOT_A_CUE_BEFORE.search(text[:marker.start()]))
 
 
 def _capitalize_item(item: str) -> str:
@@ -49,6 +72,11 @@ def _is_numbered_list(text: str, markers: list[re.Match]) -> bool:
     if not ordered:
         return False
     if not prefix and values[0] == 1:
+        return True
+    # "first ... second ... third ..." spoken in order is an enumeration even
+    # without a "here are the things" lead-in. (Dates and "the first X" are
+    # filtered out earlier, see _adjectival_ordinal.)
+    if len(markers) >= 3 and values[0] == 1:
         return True
     # A window may begin halfway through a list, after part of the previous
     # item. Require a coherent sequence and action language, not date ordinals.
@@ -111,7 +139,8 @@ def structure_text(text: str) -> str:
         text = text[subject_match.end():].strip()
     text = re.sub(r"\bnew paragraph\b[,.]?\s*", "\n\n", text, flags=re.IGNORECASE)
     text = re.sub(r"\bnew line\b[,.]?\s*", "\n", text, flags=re.IGNORECASE)
-    markers = [marker for marker in _MARKER.finditer(text) if not marker.group("digit")
+    markers = [marker for marker in _MARKER.finditer(text) if not _adjectival_ordinal(text, marker)]
+    markers = [marker for marker in markers if not marker.group("digit")
                or not text[text.rfind("\n", 0, marker.start()) + 1:marker.start()].strip()
                or re.search(r"[.!?:]\s*$", text[:marker.start()])
                or re.match(r"(?:verify|check|confirm|open|review|test|ensure|update|install|create|add|remove|save|send|fix|deploy)\b",
@@ -132,6 +161,17 @@ def structure_text(text: str) -> str:
             and _is_numbered_list(text, markers))
     )
     if is_list:
+        # "first ... second ... third ..." then later "first ... second ...":
+        # a second list. Split before it, at the last sentence break, so its
+        # introduction isn't swallowed by the previous list's last item.
+        values = [_marker_value(marker) for marker in markers]
+        restart = next((k for k in range(1, len(markers))
+                        if values[k] == 1 and any(value and value > 1 for value in values[:k])), None)
+        if restart is not None:
+            gap_start, gap_end = markers[restart - 1].end(), markers[restart].start()
+            breaks = list(re.finditer(r"[.!?][\"')]*\s+", text[gap_start:gap_end]))
+            split = gap_start + breaks[-1].end() if breaks else gap_end
+            return subject + structure_text(text[:split].strip()) + "\n\n" + structure_text(text[split:].strip())
         intro = text[:markers[0].start()].strip()
         intro = re.sub(r"\b(of|and|the|a|an|to|from|with|for)\.\s*\n\s*(?=[a-z])", r"\1 ", intro, flags=re.IGNORECASE)
         if intro and intro[-1].isalnum():
@@ -149,6 +189,8 @@ def structure_text(text: str) -> str:
                 return subject + text
             # Recording-window boundaries are soft wraps, not new list items.
             item = re.sub(r"\s*\n+\s*", " ", item)
+            # The comma that separated spoken items isn't part of the item.
+            item = re.sub(r"[,;]\s*$", "", item)
             prefix = "- " if marker.group("bullet") or marker.group("rendered_bullet") or use_bullets else f"{index + 1}. "
             items.append(prefix + _capitalize_item(item))
         text = (intro + "\n\n" if intro else "") + "\n".join(items) + ("\n\n" + outro if outro else "")
