@@ -36,22 +36,20 @@ profiles. Keep the owner dashboard private unless you deliberately share it.
 ## Build the portfolio dashboard
 
 In PostHog, create a blank private dashboard named **FlowState — Usage & reliability**.
-Add these insights (or give the following definitions to PostHog's dashboard AI):
+For a small user base, five insights answer the useful questions (who joined, who
+uses it, how much, and whether it stays fast):
 
 | Insight | Event and calculation |
 | --- | --- |
-| Monthly active installations | Unique `distinct_id` on `dictation_completed`, rolling 30 days |
+| New participating installations | Count of `analytics_enabled`, weekly |
 | Weekly active installations | Unique `distinct_id` on `dictation_completed`, rolling 7 days |
-| New participating installations | Unique `distinct_id` on `analytics_enabled` |
-| Total words transcribed | Sum `word_count` across completed, failed, and empty dictation events |
-| Words per day | Same sum, grouped daily |
-| Dictation sessions | Total count of those three dictation events |
-| Recording hours | Sum `audio_seconds` across dictation events, divided by 3,600 |
+| Total words transcribed | Sum `word_count` across completed, failed, and empty dictation events, all time |
+| Dictation sessions per day | Count of those three dictation events, daily |
 | Median time to paste | Median `processing_ms` on completed events, divided by 1,000 |
-| p95 time to paste | 95th percentile of `processing_ms` on completed events, divided by 1,000 |
-| Successful-session rate | Completed / (completed + failed); exclude no-speech sessions |
-| Returning installations | Retention with `dictation_completed` as both initial and returning event |
-| Version adoption | Unique installations grouped by `app_version` |
+
+Other questions the same events can answer later: p95 time to paste, successful-session
+rate (completed / (completed + failed)), weekly retention on `dictation_completed`, and
+installations by `app_version`.
 
 Words count whitespace-delimited ASR tokens before formatting and screenshot
 references. Words recognized during a failed paste still count as transcribed.
