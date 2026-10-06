@@ -9,7 +9,7 @@ from flowstate.usage import UsageStore, UsageTracker
 @pytest.fixture
 def usage(tmp_path):
     config=ConfigStore(path=tmp_path/'config.json')
-    tracker=UsageTracker(UsageStore(tmp_path/'usage.sqlite3'),config,key='phc_test')
+    tracker=UsageTracker(UsageStore(tmp_path/'usage.sqlite3'),config,key='phc_test',host='https://us.i.posthog.com')
     yield tracker,config
     tracker.close()
 
@@ -102,7 +102,7 @@ def test_restarting_does_not_count_as_a_new_participating_installation(usage):
     tracker,config=usage
     config.config.analytics.enabled=True;config.save()
     original=rows(tracker)[0]['properties']['distinct_id']
-    other=UsageTracker(tracker.store,config,key='phc_test')
+    other=UsageTracker(tracker.store,config,key='phc_test',host='https://us.i.posthog.com')
     assert [e['event'] for e in rows(tracker)].count('analytics_enabled')==1
     other._enqueue('app_opened',{})
     assert rows(tracker)[-1]['properties']['distinct_id']==original
