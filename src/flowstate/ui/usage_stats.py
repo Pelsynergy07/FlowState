@@ -85,6 +85,7 @@ class UsageStatsView(QWidget):
     @Slot(bool)
     def _set_consent(self, enabled):
         self.config_store.config.analytics.enabled = enabled
+        self.config_store.config.analytics.asked = True
         self.config_store.save()
         self.refresh()
 

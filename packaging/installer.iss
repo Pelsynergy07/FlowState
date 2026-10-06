@@ -3,7 +3,7 @@
 ; constants, so this installer is meant to run on any Windows 11 machine.
 
 #define MyAppName "FlowState"
-#define MyAppVersion "1.0.6-beta"
+#define MyAppVersion "1.0.7-beta"
 #define MyAppPublisher "FlowState"
 #define MyAppExeName "FlowState.exe"
 

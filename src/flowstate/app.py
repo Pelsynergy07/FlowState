@@ -176,6 +176,10 @@ class RecordingController:
         self._pipeline.grammar_enabled = cfg.cleanup.grammar_enabled
         self.switch_microphone(cfg.general.microphone_device)
 
+    def set_shortcuts(self, toggle: str, push_to_talk: str) -> None:
+        """Apply new hotkeys immediately (e.g. chosen during setup)."""
+        self._hotkeys.set_bindings(toggle, push_to_talk)
+
     def get_input_level(self) -> float:
         """Current mic input level (0..1), for a HUD level meter."""
         return self._recorder.level()

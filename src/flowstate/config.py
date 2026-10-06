@@ -51,6 +51,7 @@ class ModelConfig:
 @dataclass
 class AnalyticsConfig:
     enabled: bool = False
+    asked: bool = False  # the user has answered the sharing question once
 
 
 @dataclass

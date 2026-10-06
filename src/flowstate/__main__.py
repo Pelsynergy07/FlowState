@@ -257,11 +257,8 @@ def main() -> int:
     controller.start(warmup=not is_first_run)
 
     if is_first_run:
-        from .ui.tutorial import TutorialDialog
         onboarding = OnboardingDialog(controller)
         onboarding.exec()
-        if not onboarding.skipped and onboarding.models_ready:
-            TutorialDialog(controller).exec()
         # However setup ended (finished, skipped, failed or closed), it must
         # not reappear on every launch. Settings > About can run it again.
         paths.first_run_flag_path().write_text("done", encoding="utf-8")
@@ -290,10 +287,25 @@ def main() -> int:
                     5000,
                 )
         QTimer.singleShot(200, open_settings)
-    elif "--autostart" not in sys.argv:
-        # If user opened the app explicitly (not silent boot startup), show settings!
-        logger.info("Scheduling initial open_settings()")
-        QTimer.singleShot(100, open_settings)
+    else:
+        if "--autostart" not in sys.argv:
+            # If user opened the app explicitly (not silent boot startup), show settings!
+            logger.info("Scheduling initial open_settings()")
+            QTimer.singleShot(100, open_settings)
+
+        # People who updated from a version without the sharing question are
+        # asked once, when nothing else is going on.
+        def _ask_consent_once() -> None:
+            if controller.is_recording or controller.is_processing:
+                QTimer.singleShot(30_000, _ask_consent_once)
+                return
+            from .ui.consent import ask_once
+            try:
+                ask_once(controller.config_store)
+            except Exception:
+                logger.warning("Could not ask about anonymous stats", exc_info=True)
+
+        QTimer.singleShot(2500, _ask_consent_once)
 
     logger.info(
         "FlowState is running. Toggle: %s  Push-to-talk: %s",
