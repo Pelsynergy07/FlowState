@@ -53,11 +53,21 @@ so stopping leaves only the last few seconds to process.
 Both models are ordinary, publicly available open models -- nothing
 proprietary or FlowState-specific about them.
 
+**On a Mac (Apple silicon).** Speech runs on NVIDIA
+[Parakeet v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) on the
+Apple Neural Engine (through [FluidAudio](https://github.com/FluidInference/FluidAudio)
+and CoreML, ~460 MB). In FlowState's benchmark it was about as accurate as
+Whisper large-v3-turbo on English at a third of the size. It writes its
+own punctuation and capitals. For other languages, Settings → Model switches to
+Whisper large-v3-turbo running through Apple's MLX. Formatting uses the
+same Qwen2.5-1.5B file as CPU machines, but on the Mac's GPU through
+llama.cpp's Metal backend. The first download is about 1.6 GB.
+
 ## Screenshot capture
 
 While recording, you can also grab an annotated screenshot: either draw a
-loop with your mouse (circle mode) or hold Ctrl and drag a box (drag
-mode). FlowState screenshots that monitor, draws a highlight around the
+loop with your mouse (circle mode) or hold Ctrl (Shift on a Mac) and drag
+a box (drag mode). FlowState screenshots that monitor, draws a highlight around the
 area you indicated, and saves it into that recording's session folder.
 If you took any screenshots, the pasted text ends with a short block
 naming each one, when it was taken, and what you were saying around that
@@ -66,7 +76,8 @@ pasted text can tell which screenshot you meant.
 
 ## Where things are stored
 
-Everything lives under `%LOCALAPPDATA%\FlowState`:
+Everything lives under `%LOCALAPPDATA%\FlowState` on Windows and
+`~/Library/Application Support/FlowState` on a Mac:
 
 - `models\` -- the downloaded AI models.
 - `sessions\` -- one folder per recording: the transcript and any
@@ -89,16 +100,18 @@ completely clean uninstall.
 
 ## The hotkey mechanism
 
-FlowState listens for its hotkeys with a low-level Windows keyboard hook,
-which is what lets it recognize a chord like `Ctrl+Shift+Space` globally
-(in any app) without swallowing every other keystroke you type. It only
-intercepts the exact key combinations you've configured; everything else
-passes through untouched.
+FlowState listens for its hotkeys with a low-level Windows keyboard hook
+(a Quartz event tap on a Mac), which is what lets it recognize a chord
+like `Ctrl+Shift+Space` (`Fn+Shift+Space` on a Mac) globally, in any app,
+without swallowing every other keystroke you type. It only intercepts the
+exact key combinations you've configured; everything else passes through
+untouched. On a Mac this needs the Accessibility and Input Monitoring
+permissions, which setup asks for.
 
 ## Pasting
 
 FlowState puts the cleaned-up text on your clipboard and simulates
-Ctrl+V into whichever window had focus when you started recording, then
+Ctrl+V (Cmd+V on a Mac) into whichever window had focus when you started recording, then
 restores your previous clipboard text and images afterward. If you captured
 screenshots, each one gets pasted the same way, right after the text, so
 everything lands in one place without you doing anything extra.

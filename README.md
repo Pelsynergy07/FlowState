@@ -10,7 +10,7 @@
 
 ### *High-speed, 100% offline voice dictation with screen-context grounding for Windows and macOS.*
 
-[**Download Installer (v1.0.4 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.4-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
+[**Download for Windows**](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowStateSetup.exe) • [**Download for Mac**](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowState-macOS.dmg) • [**Website**](https://runflowstate.vercel.app/) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
@@ -44,15 +44,15 @@ Grab the standalone setup installer from our latest release:
 
 ### macOS (Apple silicon)
 
-Download `FlowState-<version>.dmg` from the latest release, drag **FlowState** into **Applications**, and open it. FlowState lives in the menu bar.
+👉 **[Download FlowState-macOS.dmg](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowState-macOS.dmg)** (~430 MB), drag **FlowState** into **Applications**, and open it. FlowState lives in the menu bar.
 
 * **System Requirements**: macOS 14 Sonoma or later on Apple silicon (M1 or newer).
 * **Speech**: NVIDIA Parakeet v2 on the Apple Neural Engine (English, about 0.1 s per 14-second stretch of speech on an M2 Max). Choose Whisper `large-v3-turbo` (MLX) in **Settings → Model** for other languages.
 * **Formatting**: the same Qwen2.5-1.5B model as Windows, on the Mac's GPU through Metal.
 * **Permissions**: setup walks you through Microphone, Accessibility and Input Monitoring (for shortcuts and pasting), plus Screen Recording if you want screenshots.
-* **Shortcuts**: hold **Right ⌥ Option** to talk, or tap **⌃ Control + ⇧ Shift + Space** for hands-free. Drag a screenshot region with **⌥ Option** held.
+* **Shortcuts**: hold **Right ⌥ Option** to talk, or press **Fn + ⇧ Shift + Space** for hands-free. Drag a screenshot region with **⇧ Shift** held.
 * First download: about 1.6 GB (Parakeet ~460 MB + Qwen ~1.1 GB).
-* The build is signed ad hoc until a Developer ID is set up: the first time, right-click FlowState in Applications and choose **Open**.
+* The app isn't notarized by Apple yet. The first time you open it, macOS stops it: go to **System Settings → Privacy & Security** and click **Open Anyway**.
 
 > [!TIP]
 > On first launch, FlowState displays an interactive setup dialog that downloads the local open-weights AI models (on NVIDIA GPUs: ~1.6 GB Whisper + ~1.5 GB Qwen2.5 text formatting; on CPU-only machines: a smaller Whisper + ~1.1 GB Qwen2.5) directly from Hugging Face. After this initial one-time download, FlowState functions entirely offline.
