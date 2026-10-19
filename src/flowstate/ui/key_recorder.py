@@ -33,6 +33,7 @@ _MAC_BADGES = {
     "cmd": "⌘ CMD",
     "cmd_l": "LEFT ⌘ CMD",
     "cmd_r": "RIGHT ⌘ CMD",
+    "fn": "🌐 FN",
     "enter": "RETURN",
     "backspace": "DELETE",
 }
@@ -50,6 +51,13 @@ _WIN_SIDE_MODIFIERS = {
     0xA3: "ctrl_r", 0xA2: "ctrl_l",
     0xA1: "shift_r", 0xA0: "shift_l",
 }
+
+
+def _fn_held() -> bool:
+    try:
+        return platform.adapter("keyboard").modifier_held("fn")
+    except Exception:
+        return False
 
 
 def _format_token_badge(token: str) -> str:
@@ -394,6 +402,9 @@ class KeyRecorderWidget(QWidget):
             parts.append("shift")
         if mods & command_mod:
             parts.append("cmd")
+        if platform.IS_MACOS and _fn_held():
+            # Qt has no Fn modifier; ask macOS directly.
+            parts.insert(0, "fn")
 
         # Resolve primary key name
         key_name = self._resolve_key_name(event)

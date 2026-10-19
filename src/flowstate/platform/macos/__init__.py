@@ -25,9 +25,13 @@ CAPABILITIES = {
 }
 
 # Control+click is a right-click on macOS, so screenshot regions are dragged
-# with Option held instead.
-DRAG_MODIFIER_TOKEN = "alt"
-DEFAULT_TOGGLE = "ctrl+shift+space"
+# with Shift held instead.
+DRAG_MODIFIER_TOKEN = "shift"
+# Fn (the 🌐 key on newer keyboards) + Shift + Space: free in macOS and in
+# common apps, unlike Control+Shift+Space.
+DEFAULT_TOGGLE = "fn+shift+space"
+# The defaults earlier Mac builds wrote to config.json; upgraded in place.
+PREVIOUS_DEFAULT_TOGGLES = ("ctrl+shift+space",)
 # Hold the right Option key: one key, rarely needed for typing (the left
 # Option key types accents and symbols), and free of system shortcuts.
 DEFAULT_PUSH_TO_TALK = "alt_r"

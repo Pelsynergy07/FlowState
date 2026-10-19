@@ -103,7 +103,16 @@ def config_from_dict(raw: dict) -> FlowStateConfig:
         return cfg
     for name, nested_type in _NESTED_TYPES.items():
         setattr(cfg, name, _parse_nested(nested_type, raw.get(name, {})))
+    _upgrade_old_defaults(cfg)
     return cfg
+
+
+def _upgrade_old_defaults(cfg: FlowStateConfig) -> None:
+    """A shortcut still set to an earlier build's default moves to the
+    current default; one the user picked themselves is left alone."""
+    previous = getattr(_platform.backend(), "PREVIOUS_DEFAULT_TOGGLES", ())
+    if cfg.shortcuts.toggle in previous:
+        cfg.shortcuts.toggle = _DEFAULT_TOGGLE
 
 
 def config_to_dict(cfg: FlowStateConfig) -> dict:

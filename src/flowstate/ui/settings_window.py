@@ -400,6 +400,7 @@ class SettingsWindow(QDialog):
         from ..platform.permissions import all_permissions
 
         rows = []
+        awaiting: set[str] = set()  # sent to System Settings; come back once on
         widgets = [_eyebrow("Permissions")]
         for permission in all_permissions():
             row = QWidget()
@@ -411,6 +412,8 @@ class SettingsWindow(QDialog):
             fix.setProperty("role", "secondary")
 
             def _fix(_checked=False, p=permission):
+                if not p.granted():
+                    awaiting.add(p.id)
                 try:
                     p.request()
                 except Exception:
@@ -423,14 +426,20 @@ class SettingsWindow(QDialog):
             line.addWidget(fix)
             widgets.append(row)
             rows.append((permission, label, fix))
-        widgets.append(_muted("Grant access in System Settings, then come back. FlowState checks every few seconds."))
+        widgets.append(_muted("Switch FlowState on in System Settings; this window comes back by itself."))
 
         def refresh() -> None:
+            came_back = False
             for permission, label, fix in rows:
                 granted = permission.granted()
+                if granted and permission.id in awaiting:
+                    awaiting.discard(permission.id)
+                    came_back = True
                 mark = "✓ Allowed" if granted else ("✕ Needed" if permission.required else "Optional")
                 label.setText(f"<b>{permission.title}</b> · {mark}<br><span style='color:#555'>{permission.why}</span>")
                 fix.setVisible(not granted)
+            if came_back:
+                self.bring_to_front()
             controller = self._controller
             if controller is not None and getattr(controller, "shortcuts_blocked", False):
                 from ..platform.permissions import missing_required
@@ -440,7 +449,7 @@ class SettingsWindow(QDialog):
 
         refresh()
         self._permission_timer = QTimer(self)
-        self._permission_timer.setInterval(3000)
+        self._permission_timer.setInterval(1000)
         self._permission_timer.timeout.connect(refresh)
         self._permission_timer.start()
         return _card(*widgets)

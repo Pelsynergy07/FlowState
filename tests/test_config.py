@@ -9,7 +9,7 @@ def test_default_config_has_expected_shape():
     from flowstate import platform
     from flowstate.asr.models import default_model_id
 
-    assert cfg.shortcuts.toggle == platform.default_shortcuts()[0] == "ctrl+shift+space"
+    assert cfg.shortcuts.toggle == platform.default_shortcuts()[0]
     assert cfg.capture.mode == "drag"
     assert cfg.model.asr_model_id == default_model_id()
 

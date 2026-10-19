@@ -35,6 +35,7 @@ _MODIFIER_KEYS = {
     0x3D: ("alt_r", "alt", 0x00000040),       # kVK_RightOption
     0x37: ("cmd_l", "cmd", 0x00000008),       # kVK_Command
     0x36: ("cmd_r", "cmd", 0x00000010),       # kVK_RightCommand
+    0x3F: ("fn", "fn", 0x00800000),           # kVK_Function (🌐), NX_SECONDARYFNMASK
 }
 
 _LETTER_KEYS = {
@@ -55,7 +56,7 @@ def keycode_to_tokens(keycode: int) -> set[str]:
     family name for modifiers ("alt_r" and "alt"), else the key's own name."""
     modifier = _MODIFIER_KEYS.get(keycode)
     if modifier is not None:
-        return {modifier[0], modifier[1]}
+        return {modifier[0], modifier[1]}  # {"fn"} for the Fn key
     name = _LETTER_KEYS.get(keycode)
     return {name} if name else set()
 
@@ -117,7 +118,7 @@ class KeyboardHook:
             if event_type == Quartz.kCGEventFlagsChanged:
                 down = modifier_is_down(keycode, Quartz.CGEventGetFlags(event))
                 if down is None:
-                    return event  # Caps Lock, Fn and other non-shortcut modifiers
+                    return event  # Caps Lock and other non-shortcut modifiers
             elif event_type == Quartz.kCGEventKeyDown:
                 down = True
             elif event_type == Quartz.kCGEventKeyUp:
@@ -174,6 +175,7 @@ def modifier_held(token: str) -> bool:
         "alt": Quartz.kCGEventFlagMaskAlternate,
         "shift": Quartz.kCGEventFlagMaskShift,
         "cmd": Quartz.kCGEventFlagMaskCommand,
+        "fn": Quartz.kCGEventFlagMaskSecondaryFn,
     }
     flags = Quartz.CGEventSourceFlagsState(Quartz.kCGEventSourceStateCombinedSessionState)
     return bool(flags & masks[token])

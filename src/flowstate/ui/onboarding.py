@@ -369,6 +369,26 @@ def _section(text: str) -> QLabel:
     return label
 
 
+def _steps(lines: list[str]) -> QFrame:
+    """Short numbered instructions, one action per line."""
+    rows = []
+    for number, text in enumerate(lines, start=1):
+        row = QWidget()
+        line = QHBoxLayout(row)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.setSpacing(12)
+        badge = QLabel(str(number))
+        badge.setFixedSize(26, 26)
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setStyleSheet(f"background: {LIME}; border: 1px solid {INK}; border-radius: 13px; "
+                            f"font-family: '{FONT_FAMILY_MONO}'; font-size: 12px; font-weight: 700;")
+        label = _body(text)
+        line.addWidget(badge, 0, Qt.AlignTop)
+        line.addWidget(label, 1)
+        rows.append(row)
+    return _card(*rows, spacing=10)
+
+
 def _card(*widgets, spacing: int = 8) -> QFrame:
     card = QFrame()
     card.setProperty("role", "card")
@@ -440,6 +460,9 @@ class OnboardingDialog(QDialog):
         self._permission_timer.setInterval(1000)
         self._permission_timer.timeout.connect(self._refresh_permissions)
         self._permission_rows: list = []
+        # Permissions the user went to System Settings for: FlowState comes
+        # back to the front as soon as each one is switched on.
+        self._awaiting_permissions: set[str] = set()
         self._step_sections: dict[str, tuple[QLabel, str]] = {}
 
         outer = QVBoxLayout(self)
@@ -665,12 +688,21 @@ class OnboardingDialog(QDialog):
             self._permission_rows.append((permission, status, allow))
         self.permission_summary = _Status()
         layout.addWidget(self.permission_summary)
+        # macOS sometimes only lets shortcuts work after a relaunch once
+        # Input Monitoring is on; offered only when that is the case.
+        self.permission_restart_btn = QPushButton("Restart FlowState to finish")
+        self.permission_restart_btn.setProperty("role", "primary")
+        self.permission_restart_btn.clicked.connect(self._restart_for_permissions)
+        self.permission_restart_btn.hide()
+        layout.addWidget(self.permission_restart_btn, 0, Qt.AlignLeft)
         layout.addWidget(_body(
             "Running FlowState from a terminal? macOS grants these to the terminal app instead.", muted=True))
         layout.addStretch(1)
         return page
 
     def _request_permission(self, permission) -> None:
+        if not permission.granted():
+            self._awaiting_permissions.add(permission.id)
         try:
             permission.request()
         except Exception:
@@ -679,25 +711,46 @@ class OnboardingDialog(QDialog):
             QDesktopServices.openUrl(QUrl(permission.settings_url))
         QTimer.singleShot(500, self._refresh_permissions)
 
+    def _come_back_to_front(self) -> None:
+        """The user just switched a permission on in System Settings: bring
+        setup back so they don't have to find it again."""
+        platform.adapter("window").bring_to_front(self)
+
+    def _restart_for_permissions(self) -> None:
+        from .restart import restart_flowstate
+
+        restart_flowstate()
+
     def _refresh_permissions(self) -> None:
         if not self._permission_rows:
             return
         missing_required = []
+        just_granted = False
         for permission, status, allow in self._permission_rows:
             granted = permission.granted()
+            if granted and permission.id in self._awaiting_permissions:
+                self._awaiting_permissions.discard(permission.id)
+                just_granted = True
             status.setText("  ✓ Allowed" if granted else "  · not allowed yet")
             status.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {'#1D7A46' if granted else DANGER_TEXT};")
             allow.setVisible(not granted)
             if permission.required and not granted:
                 missing_required.append(permission.title)
+        if just_granted:
+            self._come_back_to_front()
+        still_blocked = False
         if missing_required:
             self.permission_summary.set("Shortcuts and pasting need: " + ", ".join(missing_required) + ".", "warn")
         else:
-            self.permission_summary.set("All set. Your shortcuts work in every app.", "good")
             if getattr(self._controller, "shortcuts_blocked", False):
                 retry = getattr(self._controller, "retry_shortcuts", None)
-                if retry is not None:
-                    retry()
+                still_blocked = not (retry() if retry is not None else False)
+            if still_blocked:
+                self.permission_summary.set("Almost done: macOS needs FlowState to restart once before shortcuts work.",
+                                            "warn")
+            else:
+                self.permission_summary.set("All set. Your shortcuts work in every app.", "good")
+        self.permission_restart_btn.setVisible(still_blocked)
 
     def _build_shortcuts(self, cfg) -> QWidget:
         page, layout = self._page()
@@ -752,15 +805,19 @@ class OnboardingDialog(QDialog):
         page, layout = self._page()
         layout.addWidget(self._step_section("capture", "Screenshots (optional)"))
         layout.addWidget(_heading("Point at what you're talking about"))
-        if cfg.capture.mode == "circle":
-            how = "draw a loop around the <b>Pay now</b> button with your mouse"
-        else:
-            modifier = format_hotkey_display(platform.drag_modifier_token())
-            how = f"hold <b>{modifier}</b> and drag a box around the <b>Pay now</b> button"
         toggle = format_hotkey_display(cfg.shortcuts.toggle)
-        layout.addWidget(_body(
-            f"Tap <b>{toggle}</b>, say <i>“this button is crooked”</i>, {how}, then tap <b>{toggle}</b> again. "
-            "The screenshot is pasted with your words: handy for bug reports and AI assistants."))
+        if cfg.capture.mode == "circle":
+            point = "Circle the <b>Pay now</b> button with your mouse"
+        else:
+            point = (f"Hold <b>{format_hotkey_display(platform.drag_modifier_token())}</b> and drag a box "
+                     "around <b>Pay now</b>")
+        layout.addWidget(_steps([
+            f"Press <b>{toggle}</b> to start",
+            "Say <i>“this button is crooked”</i>",
+            point,
+            f"Press <b>{toggle}</b> again to finish",
+        ]))
+        layout.addWidget(_body("Your words and the screenshot are pasted together.", muted=True))
         layout.addWidget(_CaptureTarget())
         self.capture_btn = QPushButton(f"Start  ({toggle})")
         self.capture_btn.clicked.connect(self._toggle_recording)
