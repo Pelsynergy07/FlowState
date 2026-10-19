@@ -119,7 +119,7 @@ class UpdateInstallDialog(QDialog):
             self.status_label.setText(f"Downloading update... {mb_done:.0f}MB")
 
     def _on_ready_to_launch(self, installer_path: str) -> None:
-        self.status_label.setText("Starting installer -- FlowState will restart shortly...")
+        self.status_label.setText("Installing the update -- FlowState will restart shortly...")
         self.progress.setRange(0, 0)
         self.cancel_btn.setEnabled(False)
         try:
@@ -142,7 +142,9 @@ class UpdateInstallDialog(QDialog):
         box.addButton(QMessageBox.Close)
         box.exec()
         if box.clickedButton() is open_btn:
-            os.startfile(self._info.url)
+            import webbrowser
+
+            webbrowser.open(self._info.url)
         self.reject()
 
     def _on_cancelled(self) -> None:

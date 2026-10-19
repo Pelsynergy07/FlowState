@@ -4,6 +4,9 @@ NVIDIA GPU: Qwen2.5-1.5B-Instruct (int8) through CTranslate2, the same
 runtime faster-whisper already uses, so no extra native dependency. On an
 RTX 2070 it formats a 60-word live window in well under two seconds.
 
+Apple silicon: the same GGUF file through llama.cpp with every layer on the
+GPU via Metal, so long sections format as quickly as on CUDA.
+
 Everything else: the same model as a GGUF file through llama.cpp on the
 CPU. The CUDA-enabled llama-cpp-python wheels are not an option for the
 GPU path: they assume AVX-512 and crash with an illegal instruction on
@@ -21,13 +24,14 @@ from pathlib import Path
 from typing import Iterator
 
 from .. import paths
+from .. import platform
 
 logger = logging.getLogger("flowstate.text.llm")
 
 
 @dataclass(frozen=True)
 class FormatterModel:
-    runtime: str  # "cuda" (CTranslate2) or "cpu" (llama.cpp)
+    runtime: str  # "cuda" (CTranslate2), "metal" (llama.cpp on the Apple GPU) or "cpu" (llama.cpp)
     repo: str
     folder: str  # under paths.models_dir()
     weights: str  # file whose presence marks a complete download
@@ -53,6 +57,16 @@ CPU_MODEL = FormatterModel(
     approx_size_mb=1150,
     min_bytes=100 * 1024 * 1024,
     display_name="Qwen 1.5B, CPU",
+)
+# Same download and folder as the CPU model; only the runtime differs.
+METAL_MODEL = FormatterModel(
+    runtime="metal",
+    repo=CPU_MODEL.repo,
+    folder=CPU_MODEL.folder,
+    weights=CPU_MODEL.weights,
+    approx_size_mb=CPU_MODEL.approx_size_mb,
+    min_bytes=CPU_MODEL.min_bytes,
+    display_name="Qwen 1.5B, Apple GPU",
 )
 # Model weights plus activations and KV cache for a ~1k-token request.
 _CUDA_FREE_BYTES_REQUIRED = 2200 * 1024 * 1024
@@ -149,6 +163,8 @@ def preferred_model(device_preference: str = "auto", cuda_available: bool | None
     """Which formatter this machine should download and run."""
     if device_preference == "cpu":
         return CPU_MODEL
+    if platform.is_apple_silicon():
+        return METAL_MODEL
     if cuda_available if cuda_available is not None else cuda_device_available():
         return CUDA_MODEL
     return CPU_MODEL
@@ -210,10 +226,13 @@ class Ct2Backend:
 class LlamaCppBackend:
     runtime = "cpu"
 
-    def __init__(self, path: Path, n_threads: int = 6, context: int = 2048):
+    def __init__(self, path: Path, n_threads: int = 6, context: int = 2048, gpu: bool = False):
         from llama_cpp import Llama
 
-        self._llm = Llama(model_path=str(path), n_gpu_layers=0, n_ctx=context, n_threads=n_threads, verbose=False)
+        # gpu=True offloads every layer (Metal on Apple silicon).
+        self.runtime = "metal" if gpu else "cpu"
+        self._llm = Llama(model_path=str(path), n_gpu_layers=-1 if gpu else 0, n_ctx=context,
+                          n_threads=n_threads, verbose=False)
 
     def count_tokens(self, text: str) -> int:
         return len(self._llm.tokenize(text.encode("utf-8"), add_bos=False))
@@ -235,7 +254,7 @@ class LlamaCppBackend:
 def load_backend(model: FormatterModel):
     if model.runtime == "cuda":
         return Ct2Backend(model_dir(model))
-    return LlamaCppBackend(model_dir(model) / model.weights)
+    return LlamaCppBackend(model_dir(model) / model.weights, gpu=model.runtime == "metal")
 
 
 _download_lock = threading.Lock()

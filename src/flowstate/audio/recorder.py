@@ -1,7 +1,8 @@
 """Microphone recording into a mono WAV file via a ring-buffer queue.
 
 Requests 16 kHz directly from the device (Windows' shared-mode audio
-engine transparently resamples in the vast majority of cases). If a
+engine and macOS Core Audio transparently resample in the vast majority
+of cases). If a
 device refuses that rate, we fall back to its native rate -- correctness
 is preserved either way, because the ASR engine decodes WAV files through
 PyAV, which resamples to whatever it needs regardless of the file's rate.
@@ -30,7 +31,20 @@ class Recorder:
         self._device_index = device_index
         self._queue: queue.Queue[np.ndarray] = queue.Queue()
         self._stream: sd.InputStream | None = None
-        self._samplerate = self._detect_samplerate()
+        # Probed on first use, not here: on macOS asking Core Audio about the
+        # microphone can wait on the permission prompt, which must never
+        # block app startup.
+        self._samplerate_value: int | None = None
+
+    @property
+    def _samplerate(self) -> int:
+        if self._samplerate_value is None:
+            self._samplerate_value = self._detect_samplerate()
+        return self._samplerate_value
+
+    @_samplerate.setter
+    def _samplerate(self, value: int) -> None:
+        self._samplerate_value = value
 
     def _detect_samplerate(self) -> int:
         try:

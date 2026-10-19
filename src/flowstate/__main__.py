@@ -1,6 +1,6 @@
 """FlowState entry point: single-instance guard, tray icon, recording HUD,
 hotkeys, and (on first run) the setup wizard. This is what the installed
-.exe actually launches.
+FlowState.exe (Windows) and FlowState.app (macOS) launch.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import time
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from . import paths
+from . import paths, platform
 from .app import RecordingController
 from .logging_setup import configure_logging
 from .ui.drag_overlay import DragSelectionOverlay
@@ -28,16 +28,19 @@ from .update_check import UpdateInfo
 
 
 def _acquire_single_instance_lock():
-    """Best-effort single-instance guard via a named mutex. Returns the
-    mutex handle on success, or None if another instance already holds it."""
-    import win32api
-    import win32event
-    import winerror
+    """Best-effort single-instance guard (a named mutex on Windows, a lock
+    file on macOS). Returns the lock on success, or None if another
+    instance already holds it."""
+    return platform.adapter("system").acquire_single_instance_lock()
 
-    mutex = win32event.CreateMutex(None, False, "Global\\FlowStateSingleInstance")
-    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
-        return None
-    return mutex
+
+def _approx_download_gb(controller) -> float:
+    try:
+        from .ui.onboarding import _missing_download_mb
+
+        return max(_missing_download_mb(controller, None), 1) / 1024
+    except Exception:
+        return 3.0
 
 
 def main() -> int:
@@ -54,28 +57,22 @@ def main() -> int:
 
     logger = configure_logging()
 
-    try:
-        import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("pelsynergy.flowstate.app")
-    except Exception:
-        pass
+    system = platform.adapter("system")
+    system.prepare_process()
 
     app = QApplication(sys.argv)
+    app.setApplicationName("FlowState")
     app.setQuitOnLastWindowClosed(False)
+    system.configure_qt_application(app)
 
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
     IPC_SERVER_NAME = "FlowStateSingleInstanceIPC"
 
-    # Single-instance guard via Windows named mutex
     lock = _acquire_single_instance_lock()
     if lock is None:
         logger.info("FlowState is already running. Signaling instance to activate window...")
-        try:
-            import ctypes
-            ctypes.windll.user32.AllowSetForegroundWindow(ctypes.c_uint(-1))
-        except Exception:
-            pass
+        system.allow_other_instance_to_take_focus()
         test_socket = QLocalSocket()
         for attempt in range(6):
             test_socket.connectToServer(IPC_SERVER_NAME)
@@ -281,8 +278,8 @@ def main() -> int:
             if QSystemTrayIcon.isSystemTrayAvailable():
                 tray.tray_icon.showMessage(
                     "FlowState",
-                    "Downloading the speech and formatting models in the background (about 3 GB). "
-                    "You'll get a notification when FlowState is ready.",
+                    "Downloading the speech and formatting models in the background (about "
+                    f"{_approx_download_gb(controller):.1f} GB). You'll get a notification when FlowState is ready.",
                     QSystemTrayIcon.Information,
                     5000,
                 )
@@ -306,6 +303,21 @@ def main() -> int:
                 logger.warning("Could not ask about anonymous stats", exc_info=True)
 
         QTimer.singleShot(2500, _ask_consent_once)
+
+    def _warn_if_shortcuts_blocked() -> None:
+        # macOS refuses the keyboard tap until Accessibility and Input
+        # Monitoring are granted; say so instead of silently ignoring keys.
+        if not controller.shortcuts_blocked or not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        tray.tray_icon.showMessage(
+            "FlowState needs permission",
+            "Your shortcuts won't work until FlowState is allowed under Privacy & Security > "
+            "Accessibility and Input Monitoring. Open Settings > Permissions to fix it.",
+            QSystemTrayIcon.Warning,
+            8000,
+        )
+
+    QTimer.singleShot(1500, _warn_if_shortcuts_blocked)
 
     logger.info(
         "FlowState is running. Toggle: %s  Push-to-talk: %s",

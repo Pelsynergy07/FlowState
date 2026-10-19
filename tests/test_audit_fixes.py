@@ -67,6 +67,7 @@ def test_autostart_build_command():
     assert "--autostart" in cmd
 
 
+@pytest.mark.skipif(__import__("sys").platform != "win32", reason="Win32 clipboard adapter")
 def test_paste_restore_clipboard_none_is_noop():
     with patch("win32clipboard.OpenClipboard") as mock_open:
         _restore_clipboard(None)

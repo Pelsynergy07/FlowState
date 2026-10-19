@@ -15,8 +15,34 @@ def test_resolve_target_model_auto_with_cuda_picks_requested_model():
 
 def test_resolve_target_model_auto_without_cuda_picks_cpu_fallback():
     engine = TranscriptionEngine(model_id=DEFAULT_MODEL_ID, device_preference="auto")
-    with patch.object(engine, "_probe_cuda", return_value=False):
+    with patch.object(engine, "_probe_cuda", return_value=False), \
+         patch("flowstate.asr.engine.platform.is_apple_silicon", return_value=False):
         assert engine.resolve_target_model().id == CPU_FALLBACK_MODEL_ID
+
+
+def test_apple_silicon_prefers_parakeet_then_whisper_on_mlx():
+    engine = TranscriptionEngine(model_id="parakeet-v2", device_preference="auto")
+    with patch("flowstate.asr.engine.platform.is_apple_silicon", return_value=True), \
+         patch("flowstate.asr.engine.parakeet_backend.is_available", return_value=True):
+        assert engine.resolve_target_model().id == "parakeet-v2"
+        assert engine.model_download_plan().kind == "parakeet"
+    with patch("flowstate.asr.engine.platform.is_apple_silicon", return_value=True), \
+         patch("flowstate.asr.engine.parakeet_backend.is_available", return_value=False), \
+         patch("flowstate.asr.engine.mlx_backend.is_available", return_value=True):
+        assert engine.resolve_target_model().id == "large-v3-turbo"
+        assert engine.model_download_plan().kind == "mlx"
+
+
+def test_parakeet_choice_becomes_whisper_off_apple_silicon():
+    engine = TranscriptionEngine(model_id="parakeet-v2", device_preference="cuda")
+    with patch("flowstate.asr.engine.platform.is_apple_silicon", return_value=False):
+        assert engine.resolve_target_model().id == DEFAULT_MODEL_ID
+
+
+def test_forcing_cpu_on_apple_silicon_skips_the_neural_engine():
+    engine = TranscriptionEngine(model_id="parakeet-v2", device_preference="cpu")
+    with patch("flowstate.asr.engine.platform.is_apple_silicon", return_value=True):
+        assert engine.model_download_plan().kind == "ct2"
 
 
 def test_resolve_target_model_explicit_cuda_ignores_probe():

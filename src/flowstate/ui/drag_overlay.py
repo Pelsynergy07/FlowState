@@ -3,38 +3,29 @@ live while Ctrl+dragging a screenshot region -- otherwise the drag is
 invisible until you release the mouse and the screenshot has already
 been taken.
 
-Click-through (WS_EX_TRANSPARENT) so it never steals the very mouse
-events it's drawn in response to, and covers the whole virtual desktop
-(all monitors) since a drag can cross monitor bounds.
+Click-through (WS_EX_TRANSPARENT on Windows, ignoresMouseEvents on macOS)
+so it never steals the very mouse events it's drawn in response to, and
+covers the whole virtual desktop (all monitors) since a drag can cross
+monitor bounds.
 
-Coordinates in: capture/drag_hook.py reports raw physical-pixel mouse
-positions straight from Win32 (same space the actual screenshot capture
-uses), but Qt positions widgets in logical/DPI-scaled pixels. On a
-125%-scaled display those are two different coordinate spaces, so the
-box would render offset from the real cursor unless converted here.
+Coordinates in: on Windows capture/drag_hook.py reports raw physical-pixel
+mouse positions (same space the actual screenshot capture uses), but Qt
+positions widgets in logical/DPI-scaled pixels, so the window adapter's
+global_to_logical converts them. On macOS both are already in points.
 """
 
 from __future__ import annotations
-
-import ctypes
 
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QApplication, QWidget
 
+from .. import platform
 from .theme import ACCENT
-
-_WS_EX_TRANSPARENT = 0x00000020
-_WS_EX_LAYERED = 0x00080000
-_GWL_EXSTYLE = -20
 
 
 def _physical_to_logical(x: int, y: int) -> tuple[int, int]:
-    screen = QApplication.primaryScreen()
-    ratio = screen.devicePixelRatio() if screen else 1.0
-    if not ratio:
-        ratio = 1.0
-    return (round(x / ratio), round(y / ratio))
+    return platform.adapter("window").global_to_logical(x, y)
 
 
 class DragSelectionOverlay(QWidget):
@@ -53,10 +44,7 @@ class DragSelectionOverlay(QWidget):
         self._current: tuple[int, int] | None = None
 
     def _apply_click_through(self) -> None:
-        hwnd = int(self.winId())
-        user32 = ctypes.windll.user32
-        ex_style = user32.GetWindowLongW(hwnd, _GWL_EXSTYLE)
-        user32.SetWindowLongW(hwnd, _GWL_EXSTYLE, ex_style | _WS_EX_TRANSPARENT | _WS_EX_LAYERED)
+        platform.adapter("window").make_overlay(self, click_through=True, exclude_from_capture=True)
 
     def begin(self, x: int, y: int) -> None:
         virtual_geometry = QRect()

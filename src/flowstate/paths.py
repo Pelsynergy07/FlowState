@@ -1,6 +1,7 @@
 """Filesystem locations for FlowState's user data.
 
-Everything the running app reads or writes lives under %LOCALAPPDATA%\\FlowState.
+Everything the running app reads or writes lives under %LOCALAPPDATA%\\FlowState
+on Windows and ~/Library/Application Support/FlowState on macOS.
 No path here may ever be hardcoded to a specific machine or username — this
 module is the single place that resolves "where does FlowState live on this
 computer," which is what makes the installed app portable across machines.
@@ -9,6 +10,7 @@ computer," which is what makes the installed app portable across machines.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 APP_NAME = "FlowState"
@@ -17,6 +19,9 @@ APP_NAME = "FlowState"
 def app_data_dir() -> Path:
     """Root folder for all FlowState user data on this machine."""
     base = os.environ.get("LOCALAPPDATA")
+    if not base and sys.platform == "darwin":
+        # LOCALAPPDATA still wins when set (tests and the benchmark rely on it).
+        base = str(Path.home() / "Library" / "Application Support")
     if not base:
         # Fallback for the rare environment where LOCALAPPDATA isn't set.
         base = str(Path.home() / "AppData" / "Local")

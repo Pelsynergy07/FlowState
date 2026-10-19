@@ -1,105 +1,39 @@
 """Clipboard-based text/image injection: save the clipboard, set the new
-content, synthesize Ctrl+V into whatever window currently has focus (the
-caller must have already restored it), then restore the clipboard.
+content, synthesize the paste shortcut (Ctrl+V on Windows, Cmd+V on macOS)
+into whatever window currently has focus (the caller must have already
+restored it), then restore the clipboard.
 
-UI Automation's ValuePattern and raw WM_CHAR injection are unreliable
-across Electron/browser/terminal apps; clipboard + synthetic Ctrl+V works
-everywhere.
+The clipboard and keystroke primitives come from the platform adapter
+(platform/<os>/clipboard.py); the sequencing below is shared.
 """
 
 from __future__ import annotations
 
-import io
 import logging
 import time
 from pathlib import Path
 
-import win32api
-import win32clipboard
-import win32con
+from .. import platform
 
 logger = logging.getLogger("flowstate.inject")
 
-PASTE_SETTLE_SECONDS = 0.3
-_VK_V = 0x56
+_backend = platform.adapter("clipboard")
+if platform.IS_WINDOWS:
+    from ..platform.windows.clipboard import win32clipboard  # noqa: F401  (patched by tests)
 
+PASTE_SETTLE_SECONDS = getattr(_backend, "PASTE_SETTLE_SECONDS", 0.3)
 
-def _image_to_dib(path: Path) -> bytes:
-    from PIL import Image
-
-    img = Image.open(path).convert("RGB")
-    buf = io.BytesIO()
-    img.save(buf, "BMP")
-    return buf.getvalue()[14:]  # CF_DIB wants BITMAPINFOHEADER + pixels, no file header
-
-
-def _save_clipboard() -> dict[int, object] | None:
-    """Copy text and lossless image formats before replacing the clipboard.
-
-    DIB/DIBV5 and registered PNG bytes can be restored after EmptyClipboard;
-    CF_BITMAP is a GDI handle and cannot safely outlive that operation.
-    """
-    try:
-        win32clipboard.OpenClipboard()
-        try:
-            formats = [win32con.CF_UNICODETEXT, win32con.CF_DIB, 17,
-                       win32clipboard.RegisterClipboardFormat("PNG")]
-            snapshot = {}
-            for fmt in formats:
-                if win32clipboard.IsClipboardFormatAvailable(fmt):
-                    snapshot[fmt] = win32clipboard.GetClipboardData(fmt)
-            return snapshot or None
-        finally:
-            win32clipboard.CloseClipboard()
-    except Exception:
-        logger.warning("Failed to read clipboard for save/restore", exc_info=True)
-        return None
-
-
-def _set_clipboard_text(text: str) -> None:
-    win32clipboard.OpenClipboard()
-    try:
-        win32clipboard.EmptyClipboard()
-        if text:
-            win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, text)
-    finally:
-        win32clipboard.CloseClipboard()
-
-
-def _set_clipboard_image(image_path: Path) -> None:
-    win32clipboard.OpenClipboard()
-    try:
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, _image_to_dib(image_path))
-    finally:
-        win32clipboard.CloseClipboard()
-
-
-def _restore_clipboard(snapshot: dict[int, object] | str | None) -> None:
-    if snapshot is None:
-        return
-    # Retain compatibility with callers that saved only text.
-    if isinstance(snapshot, str):
-        snapshot = {win32con.CF_UNICODETEXT: snapshot}
-    win32clipboard.OpenClipboard()
-    try:
-        win32clipboard.EmptyClipboard()
-        for fmt, data in snapshot.items():
-            win32clipboard.SetClipboardData(fmt, data)
-    finally:
-        win32clipboard.CloseClipboard()
-
-
-def _send_ctrl_v() -> None:
-    win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-    win32api.keybd_event(_VK_V, 0, 0, 0)
-    win32api.keybd_event(_VK_V, 0, win32con.KEYEVENTF_KEYUP, 0)
-    win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
+_save_clipboard = _backend.save_clipboard
+_set_clipboard_text = _backend.set_clipboard_text
+_set_clipboard_image = _backend.set_clipboard_image
+_restore_clipboard = _backend.restore_clipboard
+_send_ctrl_v = _backend.send_paste_shortcut  # the OS paste shortcut, Cmd+V on macOS
+_remember_change_count = getattr(_backend, "remember_change_count", lambda snapshot: None)
 
 
 def paste_transcript(text: str, image_paths: list[Path] | None = None) -> None:
     """Pastes text, then each captured screenshot, into the
-    currently-focused window -- one Ctrl+V per item, each with exactly
+    currently-focused window -- one paste per item, each with exactly
     one clipboard format set at a time. Putting text and an image on the
     clipboard together for a single paste made some apps (browsers, chat
     inputs that accept image paste) treat the whole thing as an image
@@ -121,6 +55,7 @@ def paste_transcript(text: str, image_paths: list[Path] | None = None) -> None:
                 continue
             _send_ctrl_v()
             time.sleep(PASTE_SETTLE_SECONDS)
+        _remember_change_count(snapshot)
     finally:
         try:
             _restore_clipboard(snapshot)

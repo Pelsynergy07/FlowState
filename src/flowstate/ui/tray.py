@@ -9,6 +9,7 @@ from typing import Callable
 
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from .. import platform
 from ..session.store import list_sessions
 from ..update_check import UpdateInfo
 from .icon import build_tray_icon
@@ -82,7 +83,7 @@ class TrayController:
                 except Exception:
                     preview = folder.name
             action = self.recent_menu.addAction(preview or folder.name)
-            action.triggered.connect(lambda checked=False, f=folder: os.startfile(str(f)))
+            action.triggered.connect(lambda checked=False, f=folder: platform.open_path(f))
 
     def set_update_available(self, info: UpdateInfo | None) -> None:
         """Shows/hides the update menu entry. Called with None on every

@@ -1,12 +1,14 @@
 """First-run setup: one window, a few short steps, each with one job.
 
-1. Welcome: what FlowState does, this PC's hardware, what will download.
-2. Microphone: pick a device, watch a live level meter, fix Windows
-   microphone permissions.
+1. Welcome: what FlowState does, this computer's hardware, what will download.
+2. Microphone: pick a device, watch a live level meter, fix microphone
+   permissions (Windows privacy settings, or the macOS Microphone prompt).
+   macOS only: Permissions, a checklist for Accessibility, Input
+   Monitoring and (optional) Screen Recording.
 3. Shortcuts: see and change both hotkeys, with conflict warnings, and
-   choose whether FlowState starts with Windows.
+   choose whether FlowState starts when you log in.
 4. Try it: one real dictation that shows the formatting.
-5. Screenshot: one real Ctrl+drag (or circle) capture. Optional.
+5. Screenshot: one real Ctrl+drag (Option+drag on macOS) or circle capture. Optional.
 6. Finish: the anonymous-stats choice, and where FlowState lives.
 
 Models download in the background from step 1 on, so the user is never
@@ -39,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import paths
+from .. import paths, platform
 from .fonts import make_font
 from ..config import ShortcutConfig
 from .key_recorder import KeyRecorderWidget, format_hotkey_display
@@ -65,17 +67,9 @@ WIZARD_SIZE = (720, 640)  # 1080x960 at 150% scaling: fits a 1080p laptop screen
 DANGER_TEXT = "#B42318"
 WARN_BG = "#FFF4D6"
 
-# Shortcuts other popular apps already use. FlowState takes its hotkeys
-# over system-wide, so the other app's shortcut stops working.
-KNOWN_SHORTCUT_CONFLICTS = {
-    "ctrl+m": "VS Code (toggle Tab key moves focus)",
-    "ctrl+shift+space": "VS Code and JetBrains (parameter hints)",
-    "ctrl+space": "autocomplete in most code editors",
-    "ctrl+shift+m": "Microsoft Teams (mute)",
-    "ctrl+shift+a": "Slack and many browsers",
-    "alt+space": "Windows (window menu)",
-    "ctrl+alt+space": "some input-method switchers",
-}
+# Shortcuts other popular apps already use on this OS. FlowState takes its
+# hotkeys over system-wide, so the other app's shortcut stops working.
+KNOWN_SHORTCUT_CONFLICTS = platform.known_shortcut_conflicts()
 
 
 def _normalize_spec(spec: str) -> str:
@@ -91,42 +85,24 @@ def shortcut_conflict(spec: str) -> str | None:
 
 
 def microphone_access_blocked() -> bool:
-    """True if Windows privacy settings stop desktop apps using the microphone.
+    """True if OS privacy settings stop FlowState using the microphone.
 
     When blocked, every recording is silent and FlowState can only report
     "no speech detected", so setup checks it explicitly.
     """
     try:
-        import winreg
-    except ImportError:
+        return platform.adapter("system").microphone_access_blocked()
+    except Exception:
         return False
-    base = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone"
-    for hive, key_path in ((winreg.HKEY_LOCAL_MACHINE, base), (winreg.HKEY_CURRENT_USER, base),
-                           (winreg.HKEY_CURRENT_USER, base + r"\NonPackaged")):
-        try:
-            with winreg.OpenKey(hive, key_path) as key:
-                if str(winreg.QueryValueEx(key, "Value")[0]).lower() == "deny":
-                    return True
-        except OSError:
-            continue
-    return False
 
 
 def open_microphone_privacy_settings() -> None:
-    QDesktopServices.openUrl(QUrl("ms-settings:privacy-microphone"))
+    QDesktopServices.openUrl(QUrl(platform.adapter("system").MICROPHONE_SETTINGS_URL))
 
 
 def _cpu_name() -> str:
-    """Readable processor name, e.g. "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"."""
-    try:
-        import winreg
-
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
-            return " ".join(str(winreg.QueryValueEx(key, "ProcessorNameString")[0]).split())
-    except Exception:
-        import platform
-
-        return platform.processor() or "Your processor"
+    """Readable processor name, e.g. "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz" or "Apple M2 Max"."""
+    return platform.adapter("system").cpu_name()
 
 
 def _detect_hardware_summary() -> tuple[str, str, bool, int]:
@@ -140,6 +116,10 @@ def _detect_hardware_summary() -> tuple[str, str, bool, int]:
     from ..text import llm
 
     cores = os.cpu_count() or 4
+    if platform.is_apple_silicon():
+        memory = platform.adapter("system").memory_gb()
+        detail = f"Apple silicon · {memory} GB memory" if memory else "Apple silicon"
+        return _cpu_name(), detail, True, cores
     gpu = llm.cuda_device_name()
     if gpu:
         return gpu, "NVIDIA graphics card", True, cores
@@ -150,11 +130,9 @@ def _missing_download_mb(controller, is_gpu: bool) -> int:
     """Approximate size of the models this machine still has to download."""
     total = 0
     try:
-        from ..asr.engine import _find_model_dir
-
-        spec = controller._asr.resolve_target_model(cuda_available=is_gpu)
-        if _find_model_dir(paths.models_dir() / spec.id) is None:
-            total += spec.approx_size_mb
+        plan = controller._asr.model_download_plan(cuda_available=is_gpu)
+        if not plan.is_ready():
+            total += plan.approx_mb
     except Exception:
         pass
     try:
@@ -226,19 +204,16 @@ class _PreloadWorker(QObject):
             self.telemetry.emit(text)
 
     def _download_asr(self) -> None:
-        from huggingface_hub import snapshot_download
         from ..asr.downloader import download_dir_with_progress
-        from ..asr.engine import _find_model_dir
 
-        spec = self._controller._asr.resolve_target_model()
-        target_dir = paths.models_dir() / spec.id
-        if _find_model_dir(target_dir) is not None:
+        plan = self._controller._asr.model_download_plan()
+        if plan.is_ready():
             return  # Already downloaded: never needs the network.
         self.status.emit("Downloading the speech model…")
         download_dir_with_progress(
-            target_dir,
-            max(spec.approx_size_mb, 1) * 1024 * 1024,
-            do_download=lambda: snapshot_download(repo_id=spec.ct2_repo, local_dir=str(target_dir)),
+            plan.folder,
+            max(plan.approx_mb, 1) * 1024 * 1024,
+            do_download=plan.download,
             on_progress=self._on_download_progress,
         )
 
@@ -459,6 +434,13 @@ class OnboardingDialog(QDialog):
         self._meter_timer = QTimer(self)
         self._meter_timer.setInterval(50)
         self._meter_timer.timeout.connect(self._update_meter)
+        # Re-checks macOS permissions while their page is open: the user
+        # grants them in System Settings, not in this window.
+        self._permission_timer = QTimer(self)
+        self._permission_timer.setInterval(1000)
+        self._permission_timer.timeout.connect(self._refresh_permissions)
+        self._permission_rows: list = []
+        self._step_sections: dict[str, tuple[QLabel, str]] = {}
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(28, 22, 28, 18)
@@ -492,12 +474,20 @@ class OnboardingDialog(QDialog):
         self.pages: list[str] = []
         self._add_page("welcome", self._build_welcome())
         self._add_page("microphone", self._build_microphone(cfg))
+        if platform.supports("permissions_page"):
+            self._add_page("permissions", self._build_permissions())
         self._add_page("shortcuts", self._build_shortcuts(cfg))
         self._add_page("try", self._build_try(cfg))
         if cfg.capture.mode in ("drag", "circle"):
             self._add_page("capture", self._build_capture(cfg))
         self._add_page("finish", self._build_finish())
         outer.addWidget(self.stack, 1)
+        # Number the step headings from the pages actually shown (macOS adds
+        # a permissions step; the screenshot step is left out when off).
+        for index, name in enumerate(self.pages):
+            if name in self._step_sections:
+                label, title = self._step_sections[name]
+                label.setText(f"Step {index} · {title}")
 
         footer = QHBoxLayout()
         footer.setSpacing(10)
@@ -544,6 +534,11 @@ class OnboardingDialog(QDialog):
         self.stack.addWidget(scroll)
         self.pages.append(name)
 
+    def _step_section(self, name: str, title: str) -> QLabel:
+        label = _section(title)
+        self._step_sections[name] = (label, title)
+        return label
+
     @staticmethod
     def _page() -> tuple[QWidget, QVBoxLayout]:
         page = QWidget()
@@ -559,14 +554,18 @@ class OnboardingDialog(QDialog):
         layout.addWidget(_body(
             "Hold a shortcut, speak, let go. FlowState writes down what you said with punctuation, "
             "emails and lists laid out, in your own words, and pastes it into the app you're using. "
-            "It runs entirely on this PC."))
+            f"It runs entirely on this {platform.device_noun()}."))
 
-        if self.is_gpu:
+        if platform.is_apple_silicon():
+            speed = ("Apple silicon runs dictation on its Neural Engine and graphics, so text appears "
+                     "about a second after you stop talking.")
+        elif self.is_gpu:
             speed = "Your graphics card will run dictation, so text appears in about 2 seconds."
         else:
             speed = ("No NVIDIA graphics card was found, so FlowState runs on your processor with a smaller "
                      "speech model. It works fully offline; text takes a few seconds longer to appear.")
-        hardware = _card(_section("This PC"), _body(f"<b>{self.hw_name}</b>"), _body(speed, muted=True))
+        hardware = _card(_section(f"This {platform.device_noun()}"),
+                         _body(f"<b>{self.hw_name}</b> · {self.hw_detail}"), _body(speed, muted=True))
         layout.addWidget(hardware)
 
         self.welcome_download = _body(self._intro_text(self._download_mb))
@@ -578,7 +577,8 @@ class OnboardingDialog(QDialog):
     def _intro_text(needed_mb: int) -> str:
         """Say what will be downloaded before anything is."""
         if not needed_mb:
-            return "The speech and formatting models are already on this PC. Nothing to download."
+            return (f"The speech and formatting models are already on this {platform.device_noun()}. "
+                    "Nothing to download.")
         text = (f"FlowState downloads its speech and formatting models once (about {needed_mb / 1024:.1f} GB) "
                 "from Hugging Face. After that, everything runs offline. You can keep setting up while it downloads.")
         try:
@@ -592,7 +592,7 @@ class OnboardingDialog(QDialog):
 
     def _build_microphone(self, cfg) -> QWidget:
         page, layout = self._page()
-        layout.addWidget(_section("Step 1 · Microphone"))
+        layout.addWidget(self._step_section("microphone", "Microphone"))
         layout.addWidget(_heading("Pick your microphone"))
         layout.addWidget(_body("Say something. The bar should move while you talk.", muted=True))
 
@@ -621,10 +621,14 @@ class OnboardingDialog(QDialog):
                                                "border-radius: 6px; }")
         permission = QVBoxLayout(self.mic_permission_card)
         permission.setContentsMargins(14, 12, 14, 12)
-        permission_text = _body("<b>Windows is blocking microphone access for desktop apps.</b> "
-                                "Turn on “Let desktop apps access your microphone”, then come back here.")
+        if platform.IS_MACOS:
+            permission_text = _body("<b>macOS is blocking FlowState from using the microphone.</b> "
+                                    "Turn FlowState on under Privacy & Security › Microphone, then come back here.")
+        else:
+            permission_text = _body("<b>Windows is blocking microphone access for desktop apps.</b> "
+                                    "Turn on “Let desktop apps access your microphone”, then come back here.")
         permission_text.setStyleSheet(f"font-size: 13px; color: {DANGER_TEXT};")
-        fix_btn = QPushButton("Open Windows microphone settings")
+        fix_btn = QPushButton(f"Open {platform.name()} microphone settings")
         fix_btn.clicked.connect(open_microphone_privacy_settings)
         permission.addWidget(permission_text)
         permission.addWidget(fix_btn, 0, Qt.AlignLeft)
@@ -633,9 +637,71 @@ class OnboardingDialog(QDialog):
         layout.addStretch(1)
         return page
 
+    def _build_permissions(self) -> QWidget:
+        from ..platform.permissions import all_permissions
+
+        page, layout = self._page()
+        layout.addWidget(self._step_section("permissions", "Permissions"))
+        layout.addWidget(_heading("Let FlowState work in other apps"))
+        layout.addWidget(_body(
+            "macOS asks you to allow these once. Click <b>Allow</b>, switch FlowState on in the window that "
+            "opens, then come back. This page updates by itself.", muted=True))
+        self._permission_rows = []
+        for permission in all_permissions():
+            if permission.id == "microphone":
+                continue  # handled on the microphone step
+            status = QLabel()
+            allow = QPushButton("Allow")
+            allow.setProperty("role", "secondary")
+            allow.clicked.connect(lambda _checked=False, p=permission: self._request_permission(p))
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.addWidget(_body(f"<b>{permission.title}</b>{'' if permission.required else ' (optional)'}"))
+            row.addWidget(status, 1)
+            row.addWidget(allow, 0, Qt.AlignRight)
+            holder = QWidget()
+            holder.setLayout(row)
+            layout.addWidget(_card(holder, _body(permission.why, muted=True), spacing=4))
+            self._permission_rows.append((permission, status, allow))
+        self.permission_summary = _Status()
+        layout.addWidget(self.permission_summary)
+        layout.addWidget(_body(
+            "Running FlowState from a terminal? macOS grants these to the terminal app instead.", muted=True))
+        layout.addStretch(1)
+        return page
+
+    def _request_permission(self, permission) -> None:
+        try:
+            permission.request()
+        except Exception:
+            logger.warning("Could not ask for %s", permission.id, exc_info=True)
+        if not permission.granted():
+            QDesktopServices.openUrl(QUrl(permission.settings_url))
+        QTimer.singleShot(500, self._refresh_permissions)
+
+    def _refresh_permissions(self) -> None:
+        if not self._permission_rows:
+            return
+        missing_required = []
+        for permission, status, allow in self._permission_rows:
+            granted = permission.granted()
+            status.setText("  ✓ Allowed" if granted else "  · not allowed yet")
+            status.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {'#1D7A46' if granted else DANGER_TEXT};")
+            allow.setVisible(not granted)
+            if permission.required and not granted:
+                missing_required.append(permission.title)
+        if missing_required:
+            self.permission_summary.set("Shortcuts and pasting need: " + ", ".join(missing_required) + ".", "warn")
+        else:
+            self.permission_summary.set("All set. Your shortcuts work in every app.", "good")
+            if getattr(self._controller, "shortcuts_blocked", False):
+                retry = getattr(self._controller, "retry_shortcuts", None)
+                if retry is not None:
+                    retry()
+
     def _build_shortcuts(self, cfg) -> QWidget:
         page, layout = self._page()
-        layout.addWidget(_section("Step 2 · Shortcuts"))
+        layout.addWidget(self._step_section("shortcuts", "Shortcuts"))
         layout.addWidget(_heading("Your shortcuts"))
         layout.addWidget(_body("These work in every app. Click a shortcut to change it.", muted=True))
 
@@ -648,9 +714,10 @@ class OnboardingDialog(QDialog):
         self.shortcut_status = _Status()
         layout.addWidget(self.shortcut_status)
 
-        self.autostart_check = BrutalistCheckBox("Start FlowState when Windows starts", checked=True)
+        self.autostart_check = BrutalistCheckBox("Start FlowState when you log in", checked=True)
+        where = "menu bar" if platform.IS_MACOS else "system tray"
         layout.addWidget(_card(self.autostart_check, _body(
-            "FlowState sits in the system tray and only listens while you hold or tap your shortcut.",
+            f"FlowState sits in the {where} and only listens while you hold or tap your shortcut.",
             muted=True)))
         layout.addStretch(1)
         self._on_shortcut_changed()
@@ -658,7 +725,7 @@ class OnboardingDialog(QDialog):
 
     def _build_try(self, cfg) -> QWidget:
         page, layout = self._page()
-        layout.addWidget(_section("Step 3 · Try it"))
+        layout.addWidget(self._step_section("try", "Try it"))
         layout.addWidget(_heading("Say this out loud"))
         self.sample_prompt = ("Hi Sam, quick update. First, the report is done. Second, the demo moved to Friday. "
                               "Thanks, Alex")
@@ -683,12 +750,13 @@ class OnboardingDialog(QDialog):
 
     def _build_capture(self, cfg) -> QWidget:
         page, layout = self._page()
-        layout.addWidget(_section("Step 4 · Screenshots (optional)"))
+        layout.addWidget(self._step_section("capture", "Screenshots (optional)"))
         layout.addWidget(_heading("Point at what you're talking about"))
         if cfg.capture.mode == "circle":
             how = "draw a loop around the <b>Pay now</b> button with your mouse"
         else:
-            how = "hold <b>Ctrl</b> and drag a box around the <b>Pay now</b> button"
+            modifier = format_hotkey_display(platform.drag_modifier_token())
+            how = f"hold <b>{modifier}</b> and drag a box around the <b>Pay now</b> button"
         toggle = format_hotkey_display(cfg.shortcuts.toggle)
         layout.addWidget(_body(
             f"Tap <b>{toggle}</b>, say <i>“this button is crooked”</i>, {how}, then tap <b>{toggle}</b> again. "
@@ -710,9 +778,14 @@ class OnboardingDialog(QDialog):
         page, layout = self._page()
         layout.addWidget(_section("Last step"))
         layout.addWidget(_heading("You're all set"))
-        layout.addWidget(_card(_body(
-            "<b>Where FlowState lives:</b> the FlowState icon in the system tray, at the bottom right of the "
-            "taskbar (it may be under the ^ arrow). Right-click it for Settings, History and recent dictations."),
+        if platform.IS_MACOS:
+            where = ("<b>Where FlowState lives:</b> the FlowState icon in the menu bar, at the top right of the "
+                     "screen. Click it for Settings, History and recent dictations.")
+        else:
+            where = ("<b>Where FlowState lives:</b> the FlowState icon in the system tray, at the bottom right of "
+                     "the taskbar (it may be under the ^ arrow). Right-click it for Settings, History and recent "
+                     "dictations.")
+        layout.addWidget(_card(_body(where),
             _body("<b>While you talk</b> a small recording bar appears at the bottom of the screen.", muted=True)))
 
         try:
@@ -754,6 +827,7 @@ class OnboardingDialog(QDialog):
         labels = {
             "welcome": "Download && continue" if self._download_state == "idle" and self._download_mb else "Continue",
             "microphone": "Next",
+            "permissions": "Next",
             "shortcuts": "Next",
             "try": "Next",
             "capture": "Next",
@@ -764,6 +838,11 @@ class OnboardingDialog(QDialog):
         self.next_btn.setText(labels[name])
         if name == "microphone":
             self._start_mic_monitor()
+        if name == "permissions":
+            self._refresh_permissions()
+            self._permission_timer.start()
+        else:
+            self._permission_timer.stop()
         if name in ("try", "capture"):
             self._refresh_try_state()
         if name == "finish":
@@ -808,6 +887,7 @@ class OnboardingDialog(QDialog):
 
     def done(self, result: int) -> None:
         self._stop_mic_monitor()
+        self._permission_timer.stop()
         for signal, slot in self._connections:
             try:
                 signal.disconnect(slot)
@@ -881,12 +961,26 @@ class OnboardingDialog(QDialog):
             self.mic_status.set("")
             return
         self.mic_permission_card.hide()
+        if platform.IS_MACOS:
+            # Opening the microphone before macOS has asked the user would
+            # block this window until they answer, so ask first and wait.
+            from ..platform.macos import permissions as mac_permissions
+
+            if mac_permissions.microphone_status() == "undetermined":
+                mac_permissions.request_microphone()
+                self.mic_status.set("Click Allow in the macOS prompt so FlowState can hear you…", "idle")
+                QTimer.singleShot(1000, self._retry_mic_monitor)
+                return
         if self._mic_monitor.start(self.mic_combo.currentData()):
             self.mic_status.set("Listening to this microphone…", "idle")
             self._heard_voice = False
             self._meter_timer.start()
         else:
             self.mic_status.set("This microphone couldn't be opened. Try another one.", "warn")
+
+    def _retry_mic_monitor(self) -> None:
+        if self.pages[self.stack.currentIndex()] == "microphone":
+            self._start_mic_monitor()
 
     def _stop_mic_monitor(self) -> None:
         self._meter_timer.stop()

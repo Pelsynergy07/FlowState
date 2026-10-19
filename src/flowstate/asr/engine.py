@@ -20,8 +20,11 @@ import threading
 import time
 from pathlib import Path
 
-from . import models
+from dataclasses import dataclass
+
+from . import mlx_backend, models, parakeet_backend
 from .. import paths
+from .. import platform
 from ..cuda_support import ensure_cuda_dll_search_paths
 
 logger = logging.getLogger("flowstate.asr")
@@ -97,13 +100,70 @@ def _ensure_model_dir(spec: models.ModelSpec) -> Path:
     return found
 
 
+def mlx_model_dir(spec: models.ModelSpec) -> Path:
+    return paths.models_dir() / f"{spec.id}-mlx"
+
+
+def _ensure_mlx_model_dir(spec: models.ModelSpec) -> Path:
+    target_dir = mlx_model_dir(spec)
+    if mlx_backend.is_valid_model_dir(target_dir):
+        return target_dir
+    from huggingface_hub import snapshot_download
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Downloading speech model %s (%s) to %s", spec.id, spec.mlx_repo, target_dir)
+    snapshot_download(repo_id=spec.mlx_repo, local_dir=str(target_dir), allow_patterns=mlx_backend.WEIGHT_PATTERNS)
+    if not mlx_backend.is_valid_model_dir(target_dir):
+        raise RuntimeError(f"Model download completed but no MLX weights were found in {target_dir}")
+    return target_dir
+
+
+def parakeet_model_dir(spec: models.ModelSpec) -> Path:
+    return paths.models_dir() / f"{spec.id}-coreml"
+
+
+@dataclass(frozen=True)
+class DownloadPlan:
+    """Where a speech model lives and how to fetch it, for onboarding's
+    progress-tracked download."""
+
+    kind: str  # "ct2" (faster-whisper), "mlx" or "parakeet"
+    folder: Path
+    repo: str
+    approx_mb: int
+    patterns: list[str] | None = None
+    revision: str | None = None
+
+    def is_ready(self) -> bool:
+        if self.kind == "parakeet":
+            return parakeet_backend.is_valid_model_dir(self.folder)
+        if self.kind == "mlx":
+            return mlx_backend.is_valid_model_dir(self.folder)
+        return _find_model_dir(self.folder) is not None
+
+    def download(self) -> None:
+        from huggingface_hub import snapshot_download
+
+        self.folder.mkdir(parents=True, exist_ok=True)
+        logger.info("Downloading speech model %s to %s", self.repo, self.folder)
+        snapshot_download(repo_id=self.repo, local_dir=str(self.folder), revision=self.revision,
+                          allow_patterns=self.patterns)
+        if not self.is_ready():
+            raise RuntimeError(f"Model download completed but the model files are incomplete in {self.folder}")
+
+
 class TranscriptionEngine:
-    """Lazy-loaded, self-healing wrapper around faster-whisper.
+    """Lazy-loaded, self-healing speech recognizer.
+
+    Windows/Linux: faster-whisper (CTranslate2) on CUDA or the CPU.
+    Apple silicon: Parakeet v2 on the Neural Engine (the default), or
+    Whisper through MLX; both fall back to faster-whisper on the CPU.
 
     device_preference:
-      "auto" (default) - use CUDA if available, else fall back to the
-                          smaller CPU model so a first transcription on a
-                          CPU-only laptop is still fast.
+      "auto" (default) - use CUDA (Windows) or the Apple silicon route if
+                          available, else fall back to the smaller CPU
+                          model so a first transcription on a CPU-only
+                          laptop is still fast.
       "cuda"            - force CUDA; if it fails to load, fall back to
                            CPU with the originally requested model.
       "cpu"             - force CPU with the originally requested model.
@@ -138,22 +198,66 @@ class TranscriptionEngine:
     def active_model_id(self) -> str | None:
         return self._active_model_id
 
+    def _apple_route(self) -> tuple[models.ModelSpec, str] | None:
+        """(model, "parakeet" | "mlx") on Apple silicon, None elsewhere or when
+        the user forced the CPU."""
+        if not platform.is_apple_silicon() or self._device_preference == "cpu":
+            return None
+        spec = models.get_model_spec(self._requested_model_id)
+        if spec.engine == "parakeet":
+            if parakeet_backend.is_available():
+                return spec, "parakeet"
+            spec = models.get_model_spec(models.APPLE_SILICON_FALLBACK_MODEL_ID)
+        if spec.mlx_repo and mlx_backend.is_available():
+            return spec, "mlx"
+        return None
+
+    def uses_mlx(self) -> bool:
+        route = self._apple_route()
+        return route is not None and route[1] == "mlx"
+
+    def _requested_whisper_id(self) -> str:
+        """The requested model for the faster-whisper path: Parakeet only runs
+        on Apple silicon, so a Parakeet choice becomes Whisper turbo here."""
+        spec = models.get_model_spec(self._requested_model_id)
+        return models.DEFAULT_MODEL_ID if spec.engine != "whisper" else spec.id
+
+    def model_download_plan(self, cuda_available: bool | None = None) -> DownloadPlan:
+        """Where the model _load() would use lives, so onboarding can
+        download it with progress before the blocking load."""
+        route = self._apple_route()
+        if route is not None:
+            spec, kind = route
+            if kind == "parakeet":
+                return DownloadPlan("parakeet", parakeet_model_dir(spec), parakeet_backend.REPO,
+                                    spec.approx_size_mb, parakeet_backend.WEIGHT_PATTERNS, parakeet_backend.REVISION)
+            return DownloadPlan("mlx", mlx_model_dir(spec), spec.mlx_repo, spec.mlx_size_mb or spec.approx_size_mb,
+                                mlx_backend.WEIGHT_PATTERNS)
+        spec = self.resolve_target_model(cuda_available=cuda_available)
+        return DownloadPlan("ct2", paths.models_dir() / spec.id, spec.ct2_repo, spec.approx_size_mb)
+
+    def is_target_downloaded(self, cuda_available: bool | None = None) -> bool:
+        return self.model_download_plan(cuda_available=cuda_available).is_ready()
+
     def resolve_target_model(self, cuda_available: bool | None = None) -> models.ModelSpec:
         """Which model _load() would pick right now, without loading or
         downloading anything -- lets a caller (onboarding) pre-download
         with real progress before the actual, blocking load happens.
         cuda_available skips the (slow to import) CUDA probe when known."""
+        route = self._apple_route()
+        if route is not None:
+            return route[0]
         if cuda_available is None and self._device_preference == "auto":
             cuda_available = self._probe_cuda()
         want_cuda = self._device_preference == "cuda" or (
             self._device_preference == "auto" and cuda_available
         )
         if want_cuda:
-            model_id = self._requested_model_id
+            model_id = self._requested_whisper_id()
         elif self._device_preference == "auto":
             model_id = models.CPU_FALLBACK_MODEL_ID
         else:
-            model_id = self._requested_model_id
+            model_id = self._requested_whisper_id()
         return models.get_model_spec(model_id)
 
     def _probe_cuda(self) -> bool:
@@ -226,6 +330,36 @@ class TranscriptionEngine:
         return f"Could not load the speech model ({type(exc).__name__}: {exc}). Restart FlowState to try again."
 
     def _load_locked(self) -> None:
+        route = self._apple_route()
+        if route is not None and route[1] == "parakeet":
+            spec = route[0]
+            try:
+                plan = self.model_download_plan()
+                if not plan.is_ready():
+                    plan.download()
+                candidate = parakeet_backend.ParakeetModel(plan.folder)
+                self._verify_model_runs(candidate)
+                self._model = candidate
+                self._active_model_id = spec.id
+                self._active_device = "neural-engine"
+                logger.info("ASR: loaded %s on the Apple Neural Engine", spec.id)
+                return
+            except Exception:
+                logger.warning("ASR: Parakeet failed, falling back to Whisper on MLX", exc_info=True)
+                route = (models.get_model_spec(models.APPLE_SILICON_FALLBACK_MODEL_ID), "mlx")
+        if route is not None and route[1] == "mlx" and mlx_backend.is_available():
+            spec = route[0]
+            try:
+                candidate = mlx_backend.MlxWhisperModel(_ensure_mlx_model_dir(spec))
+                self._verify_model_runs(candidate)
+                self._model = candidate
+                self._active_model_id = spec.id
+                self._active_device = "mlx"
+                logger.info("ASR: loaded %s on Apple silicon (MLX)", spec.id)
+                return
+            except Exception:
+                logger.warning("ASR: MLX failed for %s, falling back to CPU", spec.id, exc_info=True)
+
         from faster_whisper import WhisperModel
 
         ensure_cuda_dll_search_paths()
@@ -235,7 +369,7 @@ class TranscriptionEngine:
         )
 
         if want_cuda:
-            spec = models.get_model_spec(self._requested_model_id)
+            spec = models.get_model_spec(self._requested_whisper_id())
             try:
                 model_dir = _ensure_model_dir(spec)
                 candidate = WhisperModel(
@@ -262,7 +396,7 @@ class TranscriptionEngine:
         if self._device_preference == "auto":
             cpu_model_id = models.CPU_FALLBACK_MODEL_ID
         else:
-            cpu_model_id = self._requested_model_id
+            cpu_model_id = self._requested_whisper_id()
         spec = models.get_model_spec(cpu_model_id)
         model_dir = _ensure_model_dir(spec)
         self._model = WhisperModel(

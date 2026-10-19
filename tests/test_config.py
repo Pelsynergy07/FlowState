@@ -6,9 +6,12 @@ from flowstate.config import ConfigStore, FlowStateConfig, config_from_dict, con
 def test_default_config_has_expected_shape():
     cfg = FlowStateConfig()
     assert cfg.version == 1
-    assert cfg.shortcuts.toggle == "ctrl+shift+space"
+    from flowstate import platform
+    from flowstate.asr.models import default_model_id
+
+    assert cfg.shortcuts.toggle == platform.default_shortcuts()[0] == "ctrl+shift+space"
     assert cfg.capture.mode == "drag"
-    assert cfg.model.asr_model_id == "large-v3-turbo"
+    assert cfg.model.asr_model_id == default_model_id()
 
 
 def test_round_trip_through_disk(tmp_path):
@@ -29,7 +32,9 @@ def test_missing_fields_fall_back_to_defaults():
     raw = {"version": 1, "shortcuts": {"toggle": "ctrl+space"}}
     cfg = config_from_dict(raw)
     assert cfg.shortcuts.toggle == "ctrl+space"
-    assert cfg.shortcuts.push_to_talk == "ctrl+m"  # default filled in
+    from flowstate import platform
+
+    assert cfg.shortcuts.push_to_talk == platform.default_shortcuts()[1]  # default filled in
     assert cfg.cleanup.grammar_enabled is True  # whole missing section defaulted
 
 

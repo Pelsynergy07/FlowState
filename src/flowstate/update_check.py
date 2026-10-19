@@ -22,13 +22,16 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import __version__, paths
+from . import __version__, paths, platform
 
 logger = logging.getLogger("flowstate.update_check")
 
 GITHUB_REPO = "Pelsynergy07/FlowState"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-INSTALLER_ASSET_NAME = "FlowStateSetup.exe"  # matches installer.iss's OutputBaseFilename
+# Release assets per platform: installer.iss's OutputBaseFilename on Windows,
+# the zipped FlowState.app from packaging/build_macos.sh on macOS.
+INSTALLER_ASSET_NAMES = {"Windows": "FlowStateSetup.exe", "macOS": "FlowState-macOS.zip"}
+INSTALLER_ASSET_NAME = INSTALLER_ASSET_NAMES.get(platform.name(), "FlowStateSetup.exe")
 REQUEST_TIMEOUT_SECONDS = 5
 CHECK_INTERVAL_SECONDS = 15 * 60
 

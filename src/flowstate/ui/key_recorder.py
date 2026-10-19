@@ -16,11 +16,46 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import platform
 from .theme import FONT_FAMILY_MONO
+
+# Mac key names, as macOS menus write them.
+_MAC_BADGES = {
+    "ctrl": "⌃ CONTROL",
+    "ctrl_l": "LEFT ⌃ CONTROL",
+    "ctrl_r": "RIGHT ⌃ CONTROL",
+    "alt": "⌥ OPTION",
+    "alt_l": "LEFT ⌥ OPTION",
+    "alt_r": "RIGHT ⌥ OPTION",
+    "shift": "⇧ SHIFT",
+    "shift_l": "LEFT ⇧ SHIFT",
+    "shift_r": "RIGHT ⇧ SHIFT",
+    "cmd": "⌘ CMD",
+    "cmd_l": "LEFT ⌘ CMD",
+    "cmd_r": "RIGHT ⌘ CMD",
+    "enter": "RETURN",
+    "backspace": "DELETE",
+}
+
+# macOS virtual key codes for side-specific modifiers (kVK_*).
+_MAC_SIDE_MODIFIERS = {
+    0x37: "cmd_l", 0x36: "cmd_r",
+    0x38: "shift_l", 0x3C: "shift_r",
+    0x3A: "alt_l", 0x3D: "alt_r",
+    0x3B: "ctrl_l", 0x3E: "ctrl_r",
+}
+# Windows virtual key codes for side-specific modifiers.
+_WIN_SIDE_MODIFIERS = {
+    0xA5: "alt_r", 0xA4: "alt_l",
+    0xA3: "ctrl_r", 0xA2: "ctrl_l",
+    0xA1: "shift_r", 0xA0: "shift_l",
+}
 
 
 def _format_token_badge(token: str) -> str:
     token = token.strip().lower()
+    if platform.IS_MACOS and token in _MAC_BADGES:
+        return _MAC_BADGES[token]
     mapping = {
         "ctrl": "CTRL",
         "ctrl_l": "L-CTRL",
@@ -322,32 +357,21 @@ class KeyRecorderWidget(QWidget):
             self.stop_recording()
             return
 
-        # Check for Win32 side-specific modifier keys
-        # VK_RMENU = 0xA5 (Right Alt), VK_LMENU = 0xA4 (Left Alt)
-        # VK_RCONTROL = 0xA3, VK_LCONTROL = 0xA2
-        # VK_RSHIFT = 0xA1, VK_LSHIFT = 0xA0
-        # VK_LWIN = 0x5B, VK_RWIN = 0x5C
-        modifier_token: str | None = None
-        if vk == 0xA5:
-            modifier_token = "alt_r"
-        elif vk == 0xA4:
-            modifier_token = "alt_l"
-        elif vk == 0xA3:
-            modifier_token = "ctrl_r"
-        elif vk == 0xA2:
-            modifier_token = "ctrl_l"
-        elif vk == 0xA1:
-            modifier_token = "shift_r"
-        elif vk == 0xA0:
-            modifier_token = "shift_l"
-        elif key == Qt.Key.Key_Control:
-            modifier_token = "ctrl"
-        elif key == Qt.Key.Key_Alt:
-            modifier_token = "alt"
-        elif key == Qt.Key.Key_Shift:
-            modifier_token = "shift"
-        elif key == Qt.Key.Key_Meta:
-            modifier_token = "cmd"
+        # Side-specific modifiers come from the native key code. On macOS Qt
+        # reports Command as Key_Control and Control as Key_Meta.
+        side_modifiers = _MAC_SIDE_MODIFIERS if platform.IS_MACOS else _WIN_SIDE_MODIFIERS
+        command_key, control_key = (Qt.Key.Key_Control, Qt.Key.Key_Meta) if platform.IS_MACOS else (
+            Qt.Key.Key_Meta, Qt.Key.Key_Control)
+        modifier_token: str | None = side_modifiers.get(vk)
+        if modifier_token is None:
+            if key == control_key:
+                modifier_token = "ctrl"
+            elif key == Qt.Key.Key_Alt:
+                modifier_token = "alt"
+            elif key == Qt.Key.Key_Shift:
+                modifier_token = "shift"
+            elif key == command_key:
+                modifier_token = "cmd"
 
         if modifier_token is not None:
             # Standalone modifier pressed -- save as pending in case it's a tap
@@ -360,13 +384,15 @@ class KeyRecorderWidget(QWidget):
         mods = event.modifiers()
         parts: list[str] = []
 
-        if mods & Qt.KeyboardModifier.ControlModifier:
+        control_mod, command_mod = (Qt.KeyboardModifier.MetaModifier, Qt.KeyboardModifier.ControlModifier) \
+            if platform.IS_MACOS else (Qt.KeyboardModifier.ControlModifier, Qt.KeyboardModifier.MetaModifier)
+        if mods & control_mod:
             parts.append("ctrl")
         if mods & Qt.KeyboardModifier.AltModifier:
             parts.append("alt")
         if mods & Qt.KeyboardModifier.ShiftModifier:
             parts.append("shift")
-        if mods & Qt.KeyboardModifier.MetaModifier:
+        if mods & command_mod:
             parts.append("cmd")
 
         # Resolve primary key name

@@ -47,3 +47,8 @@ Desktop.ini
 
 # Local Scratch Launchers
 preview.bat
+
+# Swift package build output (macOS speech helper)
+native/macos/*/.build/
+native/macos/*/Package.resolved
+.DS_Store

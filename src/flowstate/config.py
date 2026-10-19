@@ -13,6 +13,15 @@ from pathlib import Path
 from typing import Callable
 
 from . import paths
+from . import platform as _platform
+
+_DEFAULT_TOGGLE, _DEFAULT_PUSH_TO_TALK = _platform.default_shortcuts()
+
+
+def _default_asr_model_id() -> str:
+    from .asr.models import default_model_id
+
+    return default_model_id()
 
 CONFIG_VERSION = 1
 
@@ -26,8 +35,8 @@ class GeneralConfig:
 
 @dataclass
 class ShortcutConfig:
-    toggle: str = "ctrl+shift+space"
-    push_to_talk: str = "ctrl+m"
+    toggle: str = _DEFAULT_TOGGLE
+    push_to_talk: str = _DEFAULT_PUSH_TO_TALK
 
 
 @dataclass
@@ -44,8 +53,8 @@ class CleanupConfig:
 
 @dataclass
 class ModelConfig:
-    asr_model_id: str = "large-v3-turbo"
-    compute_device: str = "auto"  # "auto" | "cuda" | "cpu"
+    asr_model_id: str = field(default_factory=lambda: _default_asr_model_id())
+    compute_device: str = "auto"  # "auto" | "cuda" | "cpu" ("auto" uses Metal/MLX on Apple silicon)
 
 
 @dataclass

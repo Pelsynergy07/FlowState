@@ -100,11 +100,11 @@ class RecordingController:
     def _resolve_device_index(name: str | None) -> int | None:
         if not name:
             # No mic explicitly chosen (e.g. a fresh install) -- resolve
-            # through WASAPI's own default rather than leaving this None,
-            # which would hand PortAudio's cross-host-API-ambiguous
-            # "default" straight to the audio stream and can silently
-            # pick a non-functional device on a Windows machine with
-            # several audio host APIs installed.
+            # the system default explicitly (through WASAPI on Windows)
+            # rather than leaving this None, which would hand PortAudio's
+            # cross-host-API-ambiguous "default" straight to the audio
+            # stream and can silently pick a non-functional device on a
+            # Windows machine with several audio host APIs installed.
             default = default_input_device()
             return default.index if default is not None else None
         for d in list_input_devices():
@@ -183,6 +183,17 @@ class RecordingController:
     def get_input_level(self) -> float:
         """Current mic input level (0..1), for a HUD level meter."""
         return self._recorder.level()
+
+    @property
+    def shortcuts_blocked(self) -> bool:
+        """True when the OS refused the global keyboard hook (on macOS until
+        Accessibility and Input Monitoring are granted)."""
+        return self._hotkeys.hook_failed
+
+    def retry_shortcuts(self) -> bool:
+        """Reinstall the keyboard hook, e.g. right after the user granted
+        access. Returns True when shortcuts work."""
+        return self._hotkeys.restart_hook()
 
     @property
     def is_recording(self) -> bool:
@@ -274,7 +285,8 @@ class RecordingController:
             return
         try:
             image, monitor = capture_monitor_at(cx, cy)
-            annotated = draw_circle_highlight(image, cx, cy, monitor["left"], monitor["top"])
+            annotated = draw_circle_highlight(image, cx, cy, monitor["left"], monitor["top"],
+                                              scale=monitor.get("scale", 1.0))
             image_path = self._current_session.folder / f"capture_{len(self._captured_images) + 1}.png"
             annotated.save(image_path)
             self._captured_images.append(image_path)
@@ -289,12 +301,13 @@ class RecordingController:
         try:
             cx, cy = (left + right) / 2, (top + bottom) / 2
             image, monitor = capture_monitor_at(cx, cy)
-            annotated = draw_rect_highlight(image, left, top, right, bottom, monitor["left"], monitor["top"])
+            annotated = draw_rect_highlight(image, left, top, right, bottom, monitor["left"], monitor["top"],
+                                            scale=monitor.get("scale", 1.0))
             image_path = self._current_session.folder / f"capture_{len(self._captured_images) + 1}.png"
             annotated.save(image_path)
             self._captured_images.append(image_path)
             self._capture_offsets.append(self._elapsed_recording_seconds())
-            logger.info("Ctrl+drag captured a screenshot: %s", image_path)
+            logger.info("Drag selection captured a screenshot: %s", image_path)
         except Exception:
             logger.warning("Failed to capture/annotate screenshot from drag", exc_info=True)
 

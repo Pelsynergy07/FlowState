@@ -1,5 +1,6 @@
-"""Detects Ctrl+drag during a recording session: hold Ctrl, drag with the
-left mouse button, release to capture that rectangle. The deterministic
+"""Detects modifier+drag during a recording session: hold Ctrl (Windows) or
+Option (macOS), drag with the left mouse button, release to capture that
+rectangle. The deterministic
 alternative to the circle gesture -- no shape recognition, no false
 positives, just "did you hold Ctrl and drag."
 
@@ -19,17 +20,15 @@ stray text selection beats a frozen mouse.
 
 from __future__ import annotations
 
-import ctypes
 import logging
 import time
 from typing import Callable
 
 from pynput import mouse
 
-logger = logging.getLogger("flowstate.capture")
+from .. import platform
 
-_VK_CONTROL = 0x11
-_user32 = ctypes.windll.user32
+logger = logging.getLogger("flowstate.capture")
 
 # Caps how often on_drag_move fires -- pynput's on_move callback runs on
 # essentially every pixel of mouse motion, far more often than any UI needs
@@ -38,7 +37,8 @@ _MOVE_THROTTLE_SECONDS = 1 / 60
 
 
 def _ctrl_held() -> bool:
-    return bool(_user32.GetAsyncKeyState(_VK_CONTROL) & 0x8000)
+    """Whether the drag modifier (Ctrl on Windows, Option on macOS) is held."""
+    return platform.adapter("keyboard").modifier_held(platform.drag_modifier_token())
 
 
 class DragCaptureHook:

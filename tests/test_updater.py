@@ -1,3 +1,4 @@
+import sys
 import threading
 from unittest.mock import patch
 
@@ -35,7 +36,7 @@ def test_download_installer_writes_full_content(tmp_path):
     with patch("flowstate.updater.urllib.request.urlopen", return_value=_FakeResponse(payload, len(payload))):
         result = download_installer("https://example.com/FlowStateSetup.exe", "0.2.0")
 
-    assert result.name == "FlowStateSetup-0.2.0.exe"
+    assert result.name == ("FlowState-macOS-0.2.0.zip" if sys.platform == "darwin" else "FlowStateSetup-0.2.0.exe")
     assert result.read_bytes() == payload
     assert not result.with_name(result.name + ".part").exists()
 
@@ -85,6 +86,7 @@ def test_download_installer_wraps_network_errors(tmp_path):
             download_installer("https://example.com/FlowStateSetup.exe", "0.2.0")
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Inno Setup installer flags")
 def test_launch_installer_and_exit_invokes_silent_install_flags(tmp_path):
     installer_path = tmp_path / "FlowStateSetup-0.2.0.exe"
     installer_path.write_bytes(b"stub")
@@ -97,3 +99,24 @@ def test_launch_installer_and_exit_invokes_silent_install_flags(tmp_path):
     assert command[0] == str(installer_path)
     for flag in ("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"):
         assert flag in command
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS app-bundle swap")
+def test_macos_update_refuses_outside_the_app_bundle(tmp_path):
+    archive = tmp_path / "FlowState-macOS-0.2.0.zip"
+    archive.write_bytes(b"stub")
+    with pytest.raises(OSError):
+        launch_installer_and_exit(archive)
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS app-bundle swap")
+def test_macos_update_swaps_the_bundle_after_exit(tmp_path):
+    archive = tmp_path / "FlowState-macOS-0.2.0.zip"
+    archive.write_bytes(b"stub")
+    bundle = tmp_path / "FlowState.app"
+    with patch("flowstate.platform.macos.updater.app_bundle", return_value=bundle), \
+         patch("flowstate.platform.macos.updater.subprocess.Popen") as popen:
+        launch_installer_and_exit(archive)
+    script = popen.call_args[0][0][2]
+    assert str(archive) in script and str(bundle) in script
+    assert "kill -0" in script and "ditto" in script

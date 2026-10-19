@@ -1,112 +1,41 @@
-"""Global hotkeys via a raw Windows low-level keyboard hook (WH_KEYBOARD_LL).
+"""Global hotkeys: matches a toggle chord and a push-to-talk binding
+against live keyboard state and decides which key events to swallow.
 
-Not pynput: pynput's Listener only offers all-or-nothing suppression --
-suppress=False lets every key through (including the physical keys that
-make up your own hotkey, so holding Space for push-to-talk also types
-real spaces into whatever's focused), and suppress=True blocks *all*
-keyboard input globally, breaking normal typing entirely. Not Win32
-RegisterHotKey either: that API can't bind a bare modifier and can't
-distinguish press-vs-release for push-to-talk.
-
-A raw WH_KEYBOARD_LL hook lets us block only the specific key events that
-are part of an actively-matching binding, and pass every other keystroke
-through completely untouched.
+The matching logic here is pure and OS-independent. The OS keyboard hook
+that feeds it lives in the platform adapter (platform/windows/keyboard.py,
+a WH_KEYBOARD_LL hook; platform/macos/keyboard.py, a Quartz event tap).
+Both translate physical keys into the same tokens ("ctrl_l", "ctrl",
+"alt_r", "space", "m", ...), so bindings and this logic are shared.
 """
 
 from __future__ import annotations
 
-import ctypes
 import logging
 import queue
 import threading
-from ctypes import wintypes
 from typing import Callable
+
+from .. import platform
+from ..platform.windows.keyboard import (  # noqa: F401  (pure helpers, re-exported for tests)
+    LLKHF_EXTENDED,
+    VK_CONTROL,
+    VK_LCONTROL,
+    VK_LMENU,
+    VK_LSHIFT,
+    VK_LWIN,
+    VK_MENU,
+    VK_RCONTROL,
+    VK_RMENU,
+    VK_RSHIFT,
+    VK_RWIN,
+    VK_SHIFT,
+    VK_SPACE,
+    vk_to_tokens,
+)
 
 logger = logging.getLogger("flowstate.hotkeys")
 
-DEFAULT_TOGGLE = "ctrl+shift+space"
-DEFAULT_PUSH_TO_TALK = "shift+space"
-
-# -- Win32 constants ----------------------------------------------------
-WH_KEYBOARD_LL = 13
-WM_KEYDOWN = 0x0100
-WM_KEYUP = 0x0101
-WM_SYSKEYDOWN = 0x0104
-WM_SYSKEYUP = 0x0105
-WM_QUIT = 0x0012
-LLKHF_EXTENDED = 0x01
-LLKHF_INJECTED = 0x10  # Set by Windows when the event was injected
-
-VK_SHIFT = 0x10
-VK_CONTROL = 0x11
-VK_MENU = 0x12  # Alt
-VK_LSHIFT = 0xA0
-VK_RSHIFT = 0xA1
-VK_LCONTROL = 0xA2
-VK_RCONTROL = 0xA3
-VK_LMENU = 0xA4
-VK_RMENU = 0xA5
-VK_LWIN = 0x5B
-VK_RWIN = 0x5C
-VK_SPACE = 0x20
-
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
-
-_LRESULT = ctypes.c_longlong if ctypes.sizeof(ctypes.c_void_p) == 8 else ctypes.c_long
-_HOOKPROC = ctypes.WINFUNCTYPE(_LRESULT, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
-
-
-class _KBDLLHOOKSTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("vkCode", wintypes.DWORD),
-        ("scanCode", wintypes.DWORD),
-        ("flags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ctypes.c_void_p),
-    ]
-
-
-def vk_to_tokens(vk_code: int, flags: int) -> set[str]:
-    """Every token spelling that refers to this physical key press: a
-    side-specific name (e.g. "alt_r") and, for modifiers, the generic
-    family name too (e.g. "alt"), so a binding of "ctrl" matches either
-    physical Ctrl key while a binding of "alt_r" matches only right Alt."""
-    if vk_code == VK_CONTROL:
-        # Generic VK_CONTROL: some keyboards/drivers deliver this with
-        # LLKHF_EXTENDED marking the right key instead of the side-specific
-        # VK_LCONTROL/VK_RCONTROL codes below -- handle both spellings.
-        side = "ctrl_r" if flags & LLKHF_EXTENDED else "ctrl_l"
-        return {side, "ctrl"}
-    if vk_code == VK_LCONTROL:
-        return {"ctrl_l", "ctrl"}
-    if vk_code == VK_RCONTROL:
-        return {"ctrl_r", "ctrl"}
-    if vk_code == VK_MENU:
-        side = "alt_r" if flags & LLKHF_EXTENDED else "alt_l"
-        return {side, "alt"}
-    if vk_code == VK_LMENU:
-        return {"alt_l", "alt"}
-    if vk_code == VK_RMENU:
-        return {"alt_r", "alt"}
-    if vk_code == VK_LSHIFT:
-        return {"shift_l", "shift"}
-    if vk_code == VK_RSHIFT:
-        return {"shift_r", "shift"}
-    if vk_code == VK_SHIFT:
-        # Generic VK_SHIFT: return all shift tokens so keyup clears shift_l and shift_r
-        return {"shift_l", "shift_r", "shift"}
-    if vk_code == VK_LWIN:
-        return {"cmd_l", "cmd"}
-    if vk_code == VK_RWIN:
-        return {"cmd_r", "cmd"}
-    if vk_code == VK_SPACE:
-        return {"space"}
-    if 0x30 <= vk_code <= 0x39:  # '0'-'9'
-        return {chr(vk_code)}
-    if 0x41 <= vk_code <= 0x5A:  # 'A'-'Z'
-        return {chr(vk_code).lower()}
-    return set()
+DEFAULT_TOGGLE, DEFAULT_PUSH_TO_TALK = platform.default_shortcuts()
 
 
 class HotkeyBinding:
@@ -173,10 +102,7 @@ class HotkeyManager:
         self._worker_thread: threading.Thread | None = None
         self._running: bool = False
 
-        self._thread: threading.Thread | None = None
-        self._thread_id: int | None = None
-        self._hook_handle = None
-        self._hook_proc = None  # must keep a reference alive for the hook's lifetime
+        self._hook = None  # the platform adapter's KeyboardHook
 
     def set_bindings(self, toggle_spec: str, push_to_talk_spec: str) -> None:
         self._toggle_binding = HotkeyBinding(toggle_spec)
@@ -314,68 +240,39 @@ class HotkeyManager:
 
     # -- OS hook wiring ----------------------------------------------
 
+    def _on_os_event(self, tokens: set[str], is_down: bool) -> bool:
+        return self._on_keydown(tokens) if is_down else self._on_keyup(tokens)
+
+    @property
+    def hook_failed(self) -> bool:
+        """True when the OS refused the keyboard hook (on macOS: Accessibility
+        or Input Monitoring not granted yet)."""
+        return bool(self._hook is not None and self._hook.failed)
+
     def start(self) -> None:
         self._running = True
         self._worker_thread = threading.Thread(target=self._event_worker, daemon=True)
         self._worker_thread.start()
+        self._start_hook()
 
-        self._thread = threading.Thread(target=self._run_hook_thread, daemon=True)
-        self._thread.start()
+    def _start_hook(self) -> None:
+        keyboard = platform.adapter("keyboard")
+        self._hook = keyboard.KeyboardHook(self._on_os_event)
+        self._hook.start()
+
+    def restart_hook(self) -> bool:
+        """Try the OS hook again, e.g. after the user granted access. Returns
+        True when shortcuts now work."""
+        if self._hook is not None:
+            self._hook.stop()
+        self._pressed.clear()
+        self._suppressed_tokens.clear()
+        self._start_hook()
+        return not self.hook_failed
 
     def stop(self) -> None:
         self._running = False
         self._event_queue.put(None)
-
-        if self._thread_id is not None:
-            user32.PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)
-        if self._thread is not None:
-            self._thread.join(timeout=2)
-        self._thread = None
-        self._thread_id = None
-
-    def _run_hook_thread(self) -> None:
-        hook_handle_box: list = [None]
-
-        def _proc(n_code, w_param, l_param):
-            if n_code == 0:  # HC_ACTION
-                kb = ctypes.cast(l_param, ctypes.POINTER(_KBDLLHOOKSTRUCT)).contents
-
-                # Ignore injected keystrokes (e.g. from paste_transcript's
-                # simulated Ctrl+V). They pollute our _pressed state and
-                # can cause spurious toggle fires.
-                if kb.flags & LLKHF_INJECTED:
-                    return user32.CallNextHookEx(hook_handle_box[0], n_code, w_param, l_param)
-
-                tokens = vk_to_tokens(kb.vkCode, kb.flags)
-                suppress = False
-                try:
-                    if w_param in (WM_KEYDOWN, WM_SYSKEYDOWN):
-                        suppress = self._on_keydown(tokens)
-                    elif w_param in (WM_KEYUP, WM_SYSKEYUP):
-                        suppress = self._on_keyup(tokens)
-                except Exception:
-                    logger.error("Keyboard hook callback raised", exc_info=True)
-                if suppress:
-                    return 1
-            return user32.CallNextHookEx(hook_handle_box[0], n_code, w_param, l_param)
-
-        self._hook_proc = _HOOKPROC(_proc)
-        hook_handle_box[0] = user32.SetWindowsHookExW(WH_KEYBOARD_LL, self._hook_proc, None, 0)
-        self._hook_handle = hook_handle_box[0]
-        if not self._hook_handle:
-            logger.error("Failed to install keyboard hook: %s", ctypes.WinError())
-            self._hook_proc = None
-            return
-
-        self._thread_id = kernel32.GetCurrentThreadId()
-        logger.info("Keyboard hook installed")
-
-        msg = wintypes.MSG()
-        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
-            user32.TranslateMessage(ctypes.byref(msg))
-            user32.DispatchMessageW(ctypes.byref(msg))
-
-        user32.UnhookWindowsHookEx(self._hook_handle)
-        self._hook_handle = None
-        self._hook_proc = None
-        logger.info("Keyboard hook removed")
+        if self._hook is not None:
+            self._hook.stop()
+            self._hook = None

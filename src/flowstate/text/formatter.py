@@ -149,6 +149,7 @@ class SmartFormatter:
 
     @staticmethod
     def is_model_cached() -> bool:
+        # The Metal model shares the CPU model's file.
         return llm.is_cached(llm.CUDA_MODEL) or llm.is_cached(llm.CPU_MODEL)
 
     def clear_load_failure(self) -> None:
@@ -182,6 +183,9 @@ class SmartFormatter:
             # Falling back to the CPU runtime only uses a model already on
             # disk (e.g. from an earlier version); it is never downloaded
             # alongside the GPU one.
+            candidates.append(llm.CPU_MODEL)
+        elif target.runtime == "metal":
+            # Same file: if Metal can't start, run it on the processor.
             candidates.append(llm.CPU_MODEL)
         for model in candidates:
             if not llm.is_cached(model):

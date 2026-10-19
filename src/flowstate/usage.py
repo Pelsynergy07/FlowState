@@ -15,7 +15,7 @@ from importlib.resources import files
 from pathlib import Path
 from uuid import uuid4
 
-from . import __version__
+from . import __version__, platform
 
 logger = logging.getLogger("flowstate.usage")
 HOSTS = {"US": "https://us.i.posthog.com", "EU": "https://eu.i.posthog.com"}
@@ -181,7 +181,7 @@ class UsageTracker:
                 identifier = str(uuid4())
                 payload = {"uuid": identifier, "event": event,
                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                           "properties": {"distinct_id": identity, "app_version": __version__, "platform": "Windows",
+                           "properties": {"distinct_id": identity, "app_version": __version__, "platform": platform.name(),
                                           "$process_person_profile": False, "$geoip_disable": True, "$ip": "0.0.0.0",
                                           **properties}}
                 db.execute("INSERT INTO outbox VALUES(?,?,?)", (identifier, json.dumps(payload), time.time()))

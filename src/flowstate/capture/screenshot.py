@@ -10,11 +10,15 @@ from PIL import Image
 
 def capture_monitor_at(x: float, y: float) -> tuple[Image.Image, dict]:
     """Returns (image, monitor_geometry). monitor_geometry has left/top so
-    callers can convert virtual-screen coordinates into image-local ones."""
+    callers can convert virtual-screen coordinates into image-local ones,
+    and scale: image pixels per screen coordinate. That is 1 on Windows
+    (both are physical pixels) and 2 on a Retina Mac, where mss reports
+    monitors in points but grabs every physical pixel."""
     with mss.mss() as sct:
-        monitor = _monitor_containing(sct, x, y)
+        monitor = dict(_monitor_containing(sct, x, y))
         raw = sct.grab(monitor)
         image = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+        monitor["scale"] = raw.size[0] / monitor["width"] if monitor.get("width") else 1.0
         return image, monitor
 
 

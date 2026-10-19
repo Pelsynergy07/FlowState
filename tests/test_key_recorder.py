@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication
@@ -52,6 +54,11 @@ def test_key_recorder_captures_simple_key(qapp):
     assert w._is_recording is False
 
 
+# Qt reports the Control key as MetaModifier on macOS (Command is ControlModifier).
+CONTROL_MODIFIER = Qt.KeyboardModifier.MetaModifier if sys.platform == "darwin" else Qt.KeyboardModifier.ControlModifier
+RIGHT_ALT_NATIVE_KEY = 0x3D if sys.platform == "darwin" else 0xA5  # kVK_RightOption / VK_RMENU
+
+
 def test_key_recorder_captures_chord(qapp):
     w = KeyRecorderWidget()
     w.start_recording()
@@ -59,7 +66,7 @@ def test_key_recorder_captures_chord(qapp):
     event = QKeyEvent(
         QEvent.KeyPress,
         Qt.Key.Key_Space,
-        Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+        CONTROL_MODIFIER | Qt.KeyboardModifier.ShiftModifier,
     )
     w.keyPressEvent(event)
 
@@ -73,13 +80,13 @@ def test_key_recorder_captures_bare_modifier_tap(qapp):
     w = KeyRecorderWidget()
     w.start_recording()
 
-    # Press right Alt (nativeVirtualKey = 0xA5)
+    # Press right Alt / right Option
     ev_down = QKeyEvent(
         QEvent.KeyPress,
         Qt.Key.Key_Alt,
         Qt.KeyboardModifier.AltModifier,
         0,
-        0xA5,
+        RIGHT_ALT_NATIVE_KEY,
         0,
     )
     w.keyPressEvent(ev_down)

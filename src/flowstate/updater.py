@@ -1,4 +1,5 @@
-"""Downloads a FlowState installer and launches it to perform a self-update.
+"""Downloads a FlowState update and installs it: the Inno Setup installer on
+Windows, a zipped FlowState.app swapped in place on macOS.
 
 Deliberately Qt-free so the download/launch logic is unit-testable without
 a QApplication; ui/update_installer.py wraps this in a QThread worker with
@@ -15,7 +16,7 @@ import urllib.request
 from pathlib import Path
 from typing import Callable
 
-from . import paths
+from . import paths, platform
 
 logger = logging.getLogger("flowstate.updater")
 
@@ -48,7 +49,9 @@ def download_installer(
     finished download can never be mistaken for a complete installer, and
     a stale one from a previous failed attempt is overwritten, not
     silently reused."""
-    destination = updates_dir() / f"FlowStateSetup-{version}.exe"
+    suffix = ".zip" if platform.IS_MACOS else ".exe"
+    stem = "FlowState-macOS" if platform.IS_MACOS else "FlowStateSetup"
+    destination = updates_dir() / f"{stem}-{version}{suffix}"
     partial = destination.with_name(destination.name + ".part")
 
     request = urllib.request.Request(url, headers={"User-Agent": "FlowState-Updater"})
@@ -91,7 +94,15 @@ def launch_installer_and_exit(installer_path: Path) -> None:
     installer.iss declares AppMutex against this app's own single-instance
     mutex and its [Run] entry has no skipifsilent, so Setup will close and
     relaunch FlowState around the file replacement even if this process is
-    slow to exit on its own."""
+    slow to exit on its own.
+
+    On macOS a helper script waits for this process to exit, swaps the
+    downloaded FlowState.app in place of the running one and reopens it."""
+    if platform.IS_MACOS:
+        from .platform.macos.updater import install_and_relaunch
+
+        install_and_relaunch(installer_path)
+        return
     args = [
         str(installer_path),
         "/SILENT",

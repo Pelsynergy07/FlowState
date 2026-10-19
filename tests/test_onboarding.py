@@ -1,3 +1,4 @@
+import sys
 import pytest
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
@@ -62,7 +63,10 @@ def go_to(dlg, name):
 
 def test_one_window_with_short_steps_that_fits_a_laptop(qapp):
     dlg = OnboardingDialog(DummyController())
-    assert dlg.pages == ["welcome", "microphone", "shortcuts", "try", "capture", "finish"]
+    expected = ["welcome", "microphone", "shortcuts", "try", "capture", "finish"]
+    if sys.platform == "darwin":
+        expected.insert(2, "permissions")  # Accessibility, Input Monitoring, Screen Recording
+    assert dlg.pages == expected
     assert dlg.width() <= 720 and dlg.height() <= 640
     assert not dlg.skipped and not dlg.models_ready
     dlg.close()
@@ -156,12 +160,18 @@ def test_changing_microphone_switches_device(qapp):
 
 
 def test_shortcut_conflicts_are_flagged_and_changes_apply_immediately(qapp):
-    assert shortcut_conflict("ctrl+m")
-    assert shortcut_conflict("Shift+Ctrl+Space")
+    if sys.platform == "darwin":
+        assert shortcut_conflict("cmd+space")
+        assert shortcut_conflict("Alt+Ctrl+Space")
+    else:
+        assert shortcut_conflict("ctrl+m")
+        assert shortcut_conflict("Shift+Ctrl+Space")
     assert shortcut_conflict("alt_r") is None
     controller = DummyController()
+    controller.config_store.config.shortcuts.push_to_talk = "ctrl+m"
+    controller.config_store.config.shortcuts.toggle = "ctrl+shift+space"
     dlg = OnboardingDialog(controller)
-    assert "VS Code" in dlg.shortcut_status.text()
+    assert ("Terminal" if sys.platform == "darwin" else "VS Code") in dlg.shortcut_status.text()
     dlg.ptt_edit.setText("alt_r")
     dlg._on_shortcut_changed()
     assert controller.config_store.config.shortcuts.push_to_talk == "alt_r"

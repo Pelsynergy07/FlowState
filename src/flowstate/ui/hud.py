@@ -6,7 +6,6 @@ uses the website's diamond emblem, lime accent, and editorial timer type.
 
 from __future__ import annotations
 
-import ctypes
 import math
 import time
 
@@ -14,6 +13,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QApplication, QWidget
 
+from .. import platform
 from .fonts import make_font
 from .theme import (
     ACCENT,
@@ -28,10 +28,6 @@ from .theme import (
     PAPER_RAISED,
     PINK,
 )
-
-_WDA_EXCLUDEFROMCAPTURE = 0x00000011
-_WS_EX_NOACTIVATE = 0x08000000
-_GWL_EXSTYLE = -20
 
 _BAR_COUNT = 7
 _METER_UPDATE_MS = 45
@@ -82,14 +78,9 @@ class RecordingHUD(QWidget):
         self._notice_timer.timeout.connect(self.hide_recording)
 
     def _apply_native_window_flags(self) -> None:
-        hwnd = int(self.winId())
-        user32 = ctypes.windll.user32
-        ex_style = user32.GetWindowLongW(hwnd, _GWL_EXSTYLE)
-        user32.SetWindowLongW(hwnd, _GWL_EXSTYLE, ex_style | _WS_EX_NOACTIVATE)
-        try:
-            user32.SetWindowDisplayAffinity(hwnd, _WDA_EXCLUDEFROMCAPTURE)
-        except Exception:
-            pass
+        # Never takes focus from the app being dictated into, and never shows
+        # up in the screenshots FlowState itself captures.
+        platform.adapter("window").make_overlay(self, exclude_from_capture=True)
 
     def _reposition(self) -> None:
         screen = QApplication.primaryScreen().availableGeometry()

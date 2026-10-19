@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
 import pytest
-import win32con
+
+# These tests exercise the Win32 clipboard adapter.
+win32con = pytest.importorskip("win32con")
 
 from flowstate.inject import paste
 

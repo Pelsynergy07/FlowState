@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, paths
+from .. import __version__, paths, platform
 from ..audio.devices import list_input_devices
 from ..config import ConfigStore
 from ..hotkeys.manager import bindings_conflict
@@ -43,7 +43,7 @@ from ..update_check import UpdateInfo
 from .autostart import set_launch_at_login
 from .fonts import make_font
 from ..config import ShortcutConfig
-from .key_recorder import KeyRecorderWidget
+from .key_recorder import KeyRecorderWidget, format_hotkey_display
 from .theme import FONT_FAMILY, FONT_FAMILY_DISPLAY, FONT_FAMILY_MONO, LIME, build_stylesheet, paint_paper_background, setup_brutalist_combobox
 from .widgets import BrutalistCheckBox, StickerBadge, GeometricMotif
 from .usage_stats import UsageStatsView
@@ -97,7 +97,7 @@ def _card(*widgets: QWidget) -> QFrame:
 
 
 def _open_path(path: Path) -> None:
-    os.startfile(str(path))
+    platform.open_path(path)
 
 
 class SettingsWindow(QDialog):
@@ -145,7 +145,7 @@ class SettingsWindow(QDialog):
         badge_row.setSpacing(8)
         badge_row.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        self._version_badge = StickerBadge(f"v{__version__} // WIN64", bg_color=LIME, text_color="#121212", is_pill=False)
+        self._version_badge = StickerBadge(f"v{__version__} // {platform.badge_label()}", bg_color=LIME, text_color="#121212", is_pill=False)
         badge_row.addWidget(self._version_badge)
 
         self._header_download_btn = QPushButton("DOWNLOAD UPDATE →")
@@ -340,39 +340,7 @@ class SettingsWindow(QDialog):
         self.show()
         self.raise_()
         self.activateWindow()
-        try:
-            import ctypes
-            hwnd = int(self.winId())
-            user32 = ctypes.windll.user32
-            kernel32 = ctypes.windll.kernel32
-
-            if user32.IsIconic(hwnd):
-                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-            else:
-                user32.ShowWindow(hwnd, 5)  # SW_SHOW
-
-            # Force window to top via HWND_TOPMOST toggle
-            HWND_TOPMOST = -1
-            HWND_NOTOPMOST = -2
-            SWP_NOMOVE = 0x0002
-            SWP_NOSIZE = 0x0001
-            SWP_SHOWWINDOW = 0x0040
-            user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
-            user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
-
-            fore_hwnd = user32.GetForegroundWindow()
-            fore_thread = user32.GetWindowThreadProcessId(fore_hwnd, None)
-            app_thread = kernel32.GetCurrentThreadId()
-            if fore_thread != app_thread:
-                user32.AttachThreadInput(fore_thread, app_thread, True)
-                user32.BringWindowToTop(hwnd)
-                user32.SetForegroundWindow(hwnd)
-                user32.AttachThreadInput(fore_thread, app_thread, False)
-            else:
-                user32.BringWindowToTop(hwnd)
-                user32.SetForegroundWindow(hwnd)
-        except Exception:
-            pass
+        platform.adapter("window").bring_to_front(self)
 
     # -- General --------------------------------------------------------
     def _build_stats_tab(self) -> QWidget:
@@ -400,7 +368,7 @@ class SettingsWindow(QDialog):
         mic_meta_row = QHBoxLayout(mic_meta_widget)
         mic_meta_row.setContentsMargins(0, 0, 0, 0)
         mic_meta_row.setSpacing(8)
-        self.mic_status_lbl = QLabel("Uses your selected Windows audio input")
+        self.mic_status_lbl = QLabel(f"Uses your selected {platform.name()} audio input")
         self.mic_status_lbl.setProperty("role", "mono")
         self.mic_status_lbl.setProperty("role", "muted")
         mic_meta_row.addWidget(self.mic_status_lbl, 1)
@@ -414,12 +382,68 @@ class SettingsWindow(QDialog):
 
         layout.addWidget(_card(_eyebrow("Microphone"), self.mic_combo, mic_meta_widget))
 
-        self.launch_at_login = BrutalistCheckBox("Launch FlowState automatically when Windows starts", checked=cfg.launch_at_login)
+        if platform.supports("permissions_page"):
+            layout.addWidget(self._build_permissions_card())
+
+        self.launch_at_login = BrutalistCheckBox("Launch FlowState automatically when you log in", checked=cfg.launch_at_login)
         self.sound_cues = BrutalistCheckBox("Play a sound when recording starts and stops", checked=cfg.sound_cues)
         layout.addWidget(_card(_eyebrow("Everyday behavior"), self.launch_at_login, self.sound_cues))
 
         layout.addStretch(1)
         return page
+
+    def _build_permissions_card(self) -> QFrame:
+        """macOS privacy permissions, each with its state and a button to fix it."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from ..platform.permissions import all_permissions
+
+        rows = []
+        widgets = [_eyebrow("Permissions")]
+        for permission in all_permissions():
+            row = QWidget()
+            line = QHBoxLayout(row)
+            line.setContentsMargins(0, 0, 0, 0)
+            label = QLabel()
+            label.setWordWrap(True)
+            fix = QPushButton("Open settings")
+            fix.setProperty("role", "secondary")
+
+            def _fix(_checked=False, p=permission):
+                try:
+                    p.request()
+                except Exception:
+                    pass
+                if not p.granted():
+                    QDesktopServices.openUrl(QUrl(p.settings_url))
+
+            fix.clicked.connect(_fix)
+            line.addWidget(label, 1)
+            line.addWidget(fix)
+            widgets.append(row)
+            rows.append((permission, label, fix))
+        widgets.append(_muted("Grant access in System Settings, then come back. FlowState checks every few seconds."))
+
+        def refresh() -> None:
+            for permission, label, fix in rows:
+                granted = permission.granted()
+                mark = "✓ Allowed" if granted else ("✕ Needed" if permission.required else "Optional")
+                label.setText(f"<b>{permission.title}</b> · {mark}<br><span style='color:#555'>{permission.why}</span>")
+                fix.setVisible(not granted)
+            controller = self._controller
+            if controller is not None and getattr(controller, "shortcuts_blocked", False):
+                from ..platform.permissions import missing_required
+
+                if not missing_required():
+                    controller.retry_shortcuts()
+
+        refresh()
+        self._permission_timer = QTimer(self)
+        self._permission_timer.setInterval(3000)
+        self._permission_timer.timeout.connect(refresh)
+        self._permission_timer.start()
+        return _card(*widgets)
 
     def _on_mic_selected(self) -> None:
         new_mic = self.mic_combo.currentData()
@@ -435,7 +459,7 @@ class SettingsWindow(QDialog):
             self.mic_status_lbl.setStyleSheet("color: #b05a00; font-weight: 700; font-size: 11px;")
         else:
             self._mic_restart_btn.hide()
-            self.mic_status_lbl.setText("Uses your selected Windows audio input")
+            self.mic_status_lbl.setText(f"Uses your selected {platform.name()} audio input")
             self.mic_status_lbl.setProperty("role", "muted")
 
 
@@ -494,16 +518,35 @@ class SettingsWindow(QDialog):
         layout.setContentsMargins(0, 20, 4, 8)
         layout.setSpacing(18)
 
+        self.asr_model_combo = None
+        if platform.is_apple_silicon():
+            self.asr_model_combo = QComboBox()
+            self.asr_model_combo.setFixedHeight(40)
+            setup_brutalist_combobox(self.asr_model_combo)
+            self.asr_model_combo.addItem("Parakeet v2 · English · fastest (recommended)", "parakeet-v2")
+            self.asr_model_combo.addItem("Whisper large-v3-turbo · 99 languages", "large-v3-turbo")
+            index = self.asr_model_combo.findData(cfg.asr_model_id)
+            self.asr_model_combo.setCurrentIndex(index if index >= 0 else 0)
+            layout.addWidget(_card(
+                _eyebrow("Speech model"),
+                self.asr_model_combo,
+                _muted("Parakeet runs on the Apple Neural Engine and is the most accurate for English. "
+                       "Choose Whisper if you dictate in other languages. Switching downloads the model "
+                       "once and restarts FlowState."),
+            ))
+
         self.device_combo = QComboBox()
         self.device_combo.setFixedHeight(40)
         setup_brutalist_combobox(self.device_combo)
-        self.device_combo.addItems(["auto", "cuda", "cpu"])
+        self.device_combo.addItems(["auto", "cuda", "cpu"] if platform.supports("cuda") else ["auto", "cpu"])
         self.device_combo.setCurrentText(cfg.compute_device)
         layout.addWidget(
             _card(
                 _eyebrow("Speech recognition device"),
                 self.device_combo,
-                _muted("Auto uses your GPU when available and falls back to CPU automatically."),
+                _muted("Auto uses Apple silicon's GPU and Neural Engine and falls back to the processor automatically."
+                       if platform.IS_MACOS else
+                       "Auto uses your GPU when available and falls back to CPU automatically."),
                 self._build_device_status_label(),
             )
         )
@@ -520,9 +563,13 @@ class SettingsWindow(QDialog):
         active_model = getattr(asr, "active_model_id", None) if asr else None
         if active_device == "cuda":
             label.setText(f"Currently running on: your GPU (CUDA, {active_model}) -- fast transcription.")
+        elif active_device == "neural-engine":
+            label.setText(f"Currently running on: the Apple Neural Engine ({active_model}) -- fast transcription.")
+        elif active_device == "mlx":
+            label.setText(f"Currently running on: Apple silicon (MLX, {active_model}) -- fast transcription.")
         elif active_device == "cpu":
             label.setText(
-                f"Currently running on: CPU ({active_model}) -- no compatible NVIDIA GPU/CUDA was "
+                f"Currently running on: CPU ({active_model}) -- no supported graphics acceleration was "
                 "detected, so FlowState fell back to a smaller, CPU-friendly model. Transcription "
                 "still works, just noticeably slower than on a GPU."
             )
@@ -562,7 +609,7 @@ class SettingsWindow(QDialog):
         self.capture_mode = QComboBox()
         self.capture_mode.setFixedHeight(40)
         setup_brutalist_combobox(self.capture_mode)
-        self.capture_mode.addItem("Hold Ctrl and drag", "drag")
+        self.capture_mode.addItem(f"Hold {format_hotkey_display(platform.drag_modifier_token())} and drag", "drag")
         self.capture_mode.addItem("Click to draw circle", "circle")
         self.capture_mode.addItem("Off", "off")
         idx = self.capture_mode.findData(cfg.mode)
@@ -951,7 +998,7 @@ class SettingsWindow(QDialog):
         update_card_layout.addWidget(_eyebrow("Version & updates"))
 
         ver_row = QHBoxLayout()
-        ver_lbl = QLabel(f"FlowState v{__version__} // Windows Native x64")
+        ver_lbl = QLabel(f"FlowState v{__version__} // {platform.build_label()}")
         ver_lbl.setStyleSheet(f"font-family: {FONT_FAMILY_MONO}; font-size: 12px; font-weight: 800; color: #000000;")
         ver_row.addWidget(ver_lbl, 1)
 
@@ -1037,7 +1084,7 @@ class SettingsWindow(QDialog):
         self._update_info = info
         if hasattr(self, "_version_badge"):
             if info is None:
-                self._version_badge.setText(f"v{__version__} // WIN64")
+                self._version_badge.setText(f"v{__version__} // {platform.badge_label()}")
                 self._version_badge.setColors(LIME, "#121212")
                 if hasattr(self, "_header_download_btn"):
                     self._header_download_btn.hide()
@@ -1115,6 +1162,11 @@ class SettingsWindow(QDialog):
         cfg.shortcuts.push_to_talk = new_ptt
 
         cfg.model.compute_device = self.device_combo.currentText()
+        model_changed = False
+        if self.asr_model_combo is not None:
+            chosen = self.asr_model_combo.currentData()
+            model_changed = chosen != cfg.model.asr_model_id
+            cfg.model.asr_model_id = chosen
 
         cfg.cleanup.vocabulary_enabled = self.vocab_check.isChecked()
         cfg.cleanup.grammar_enabled = self.grammar_check.isChecked()
@@ -1126,3 +1178,10 @@ class SettingsWindow(QDialog):
         if self._on_applied:
             self._on_applied()
         self.accept()
+        if model_changed:
+            reply = QMessageBox.question(
+                None, "FlowState",
+                "The new speech model is used after FlowState restarts. Restart now?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                self._restart_app()

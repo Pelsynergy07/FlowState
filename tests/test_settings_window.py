@@ -28,7 +28,9 @@ def test_settings_window_header_no_stamp_no_100_percent(qapp):
 
     # 1. Check version badge default state
     assert dlg._version_badge is not None
-    assert dlg._version_badge.getText() == f"v{__version__} // WIN64"
+    from flowstate import platform
+
+    assert dlg._version_badge.getText() == f"v{__version__} // {platform.badge_label()}"
 
     # 2. Check download button initially hidden
     assert dlg._header_download_btn is not None
@@ -54,7 +56,9 @@ def test_settings_window_header_no_stamp_no_100_percent(qapp):
 
     # 5. Reset to up-to-date
     dlg.set_update_info(None)
-    assert dlg._version_badge.getText() == f"v{__version__} // WIN64"
+    from flowstate import platform
+
+    assert dlg._version_badge.getText() == f"v{__version__} // {platform.badge_label()}"
     assert dlg._header_download_btn.isHidden()
 
     dlg.close()
