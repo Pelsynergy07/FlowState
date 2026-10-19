@@ -1,7 +1,8 @@
 """macOS adapter: Quartz event taps, NSPasteboard, NSWorkspace and AppKit
 window tweaks, all through PyObjC.
 
-FlowState runs as a menu-bar app (no Dock icon). macOS asks the user for
+FlowState lives in the menu bar and shows a Dock icon only while one of
+its windows is open (see system.configure_qt_application). macOS asks the user for
 four permissions, which onboarding walks through (see permissions.py):
 Microphone, Accessibility (to paste and to use global shortcuts),
 Input Monitoring (to see shortcut keys) and, for screenshots only,

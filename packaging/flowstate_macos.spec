@@ -109,8 +109,10 @@ app = BUNDLE(
         "CFBundleShortVersionString": SHORT_VERSION,
         "CFBundleVersion": VERSION,
         "LSMinimumSystemVersion": "14.0",
-        # Menu-bar app: no Dock icon, like the Windows tray app.
-        "LSUIElement": True,
+        # A regular app, so it appears in Launchpad and Spotlight's app list.
+        # FlowState hides its Dock icon itself whenever no window is open
+        # (platform/macos/system.py), so it still behaves like a menu-bar app.
+        "LSApplicationCategoryType": "public.app-category.productivity",
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription":
             "FlowState listens only while you hold or tap your dictation shortcut, and turns your speech into "

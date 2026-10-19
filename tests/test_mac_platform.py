@@ -71,3 +71,22 @@ def test_screenshot_step_is_short_numbered_steps(qapp):
     assert [t for t in texts if t in ("1", "2", "3", "4")] == ["1", "2", "3", "4"]
     assert all(len(t) < 140 for t in texts)
     dlg.close()
+
+
+@mac
+def test_dock_icon_follows_settings_windows_not_the_recording_bar(qapp):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QDialog, QWidget
+
+    from flowstate.platform.macos.system import _is_app_window
+
+    settings = QDialog()
+    hud = QWidget()
+    hud.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+    settings.show()
+    hud.show()
+    assert _is_app_window(settings) is True
+    assert _is_app_window(hud) is False
+    settings.hide()
+    assert _is_app_window(settings) is False
+    hud.close()

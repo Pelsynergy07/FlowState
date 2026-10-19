@@ -40,21 +40,89 @@ def prepare_process() -> None:
 
 
 def configure_qt_application(app) -> None:
-    """Menu-bar app: no Dock icon and no app menu, like the Windows tray app.
-    The packaged app also sets LSUIElement in Info.plist.
+    """Menu-bar app with a Dock icon only while a FlowState window is open.
+
+    Without windows FlowState lives in the menu bar alone, like the Windows
+    tray app. While Settings or setup is open it is a regular app: it shows
+    in the Dock and Cmd-Tab, and its windows minimize to the Dock.
 
     FlowState draws its own light paper-and-ink design. The native macOS
     style would paint tab bars and scroll bars in Dark Mode colors under
     it, so Qt's neutral Fusion style is used and windows stay light."""
     app.setStyle("Fusion")
     try:
-        from AppKit import NSAppearance, NSApplication, NSApplicationActivationPolicyAccessory
+        from AppKit import NSAppearance, NSApplication
+
+        NSApplication.sharedApplication().setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+    except Exception:
+        logger.debug("Could not force the light appearance", exc_info=True)
+    set_dock_icon_visible(False)
+    global _dock_watcher
+    _dock_watcher = _make_dock_presence()(app)
+
+
+_dock_watcher = None
+_dock_visible: bool | None = None
+
+
+def set_dock_icon_visible(visible: bool) -> None:
+    global _dock_visible
+    if visible == _dock_visible:
+        return
+    try:
+        from AppKit import (
+            NSApplication,
+            NSApplicationActivationPolicyAccessory,
+            NSApplicationActivationPolicyRegular,
+        )
 
         ns_app = NSApplication.sharedApplication()
-        ns_app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
-        ns_app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+        ns_app.setActivationPolicy_(NSApplicationActivationPolicyRegular if visible
+                                    else NSApplicationActivationPolicyAccessory)
+        if visible:
+            ns_app.activateIgnoringOtherApps_(True)
+        _dock_visible = visible
     except Exception:
-        logger.debug("Could not switch to menu-bar app mode", exc_info=True)
+        logger.debug("Could not change the Dock icon", exc_info=True)
+
+
+def _is_app_window(widget) -> bool:
+    """Settings, setup and dialogs; not the recording bar or drag overlay."""
+    from PySide6.QtCore import Qt
+
+    if not widget.isWindow() or not widget.isVisible():
+        return False
+    flags = widget.windowFlags()
+    return not (flags & Qt.WindowType.FramelessWindowHint) and (flags & Qt.WindowType.Tool) != Qt.WindowType.Tool
+
+
+def _make_dock_presence():
+    from PySide6.QtCore import QEvent, QObject, QTimer
+    from PySide6.QtWidgets import QApplication
+
+    class DockPresence(QObject):
+        """Shows the Dock icon while any FlowState window is open."""
+
+        _WATCHED = (QEvent.Type.Show, QEvent.Type.Hide, QEvent.Type.Close)
+
+        def __init__(self, app):
+            super().__init__(app)
+            self._pending = False
+            app.installEventFilter(self)
+
+        def eventFilter(self, obj, event):
+            if event.type() in self._WATCHED and not self._pending:
+                self._pending = True
+                QTimer.singleShot(0, self._update)
+            return False
+
+        def _update(self):
+            self._pending = False
+            app = QApplication.instance()
+            if app is not None:
+                set_dock_icon_visible(any(_is_app_window(w) for w in app.topLevelWidgets()))
+
+    return DockPresence
 
 
 def acquire_single_instance_lock():
