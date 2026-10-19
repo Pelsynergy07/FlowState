@@ -1,0 +1,7 @@
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+-r requirements-base.txt
+onnxruntime-gpu==1.22.0
+nvidia-cublas-cu12==12.8.4.1; sys_platform == "win32"
+nvidia-cudnn-cu12==9.10.2.21; sys_platform == "win32"
+nvidia-cuda-runtime-cu12==12.8.90; sys_platform == "win32"
+nvidia-cuda-nvrtc-cu12==12.8.93; sys_platform == "win32"

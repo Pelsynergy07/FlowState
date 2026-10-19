@@ -1,0 +1,16 @@
+[
+  {
+    "url": "https://www.openslr.org/resources/12/test-clean.tar.gz",
+    "sha256": "39fde525e59672dc6d1551919b1478f724438a95aa55f874b576be21967e6c23",
+    "bytes": 346663984,
+    "licence": "CC BY 4.0",
+    "licence_source": "https://www.openslr.org/12/"
+  },
+  {
+    "url": "https://www.openslr.org/resources/12/test-other.tar.gz",
+    "sha256": "d09c181bba5cf717b3dee7d4d592af11a3ee3a09e08ae025c5506f6ebe961c29",
+    "bytes": 328757843,
+    "licence": "CC BY 4.0",
+    "licence_source": "https://www.openslr.org/12/"
+  }
+]

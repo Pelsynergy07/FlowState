@@ -1,0 +1,9 @@
+bench/models/
+bench/native-models/
+bench/.hf/
+bench/.appdata/
+bench/results/
+bench/machine.json
+bench/data/recordings/
+.venv*/
+**/__pycache__/

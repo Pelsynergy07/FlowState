@@ -1,0 +1,202 @@
+[
+  {
+    "stage": "First formatter tests",
+    "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+    "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+    "weight_files": [
+      "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    ],
+    "weight_bytes": 1117320736,
+    "license": "apache-2.0",
+    "gated": false
+  },
+  {
+    "stage": "First formatter tests",
+    "repo": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+    "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+    "weight_files": [
+      "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "qwen2.5-0.5b-instruct-q8_0.gguf"
+    ],
+    "weight_bytes": 1167110848,
+    "license": "apache-2.0",
+    "gated": false
+  },
+  {
+    "stage": "First formatter tests",
+    "repo": "Qwen/Qwen3-0.6B-GGUF",
+    "revision": "23749fefcc72300e3a2ad315e1317431b06b590a",
+    "weight_files": [
+      "Qwen3-0.6B-Q8_0.gguf"
+    ],
+    "weight_bytes": 639446688,
+    "license": "apache-2.0",
+    "gated": false
+  },
+  {
+    "stage": "First formatter tests",
+    "repo": "rabden/t5-tiny-gec-hone",
+    "revision": "d5f27b81d5316bd689977d722d3ed513bbb9122c",
+    "weight_files": [
+      "onnx/encoder_model_quantized.onnx",
+      "onnx/decoder_model_merged_quantized.onnx"
+    ],
+    "weight_bytes": 32414206,
+    "license": "mit",
+    "gated": false
+  },
+  {
+    "stage": "Speech tests",
+    "repo": "deepdml/faster-whisper-large-v3-turbo-ct2",
+    "revision": "4df90f75321148c3a29a9e2351b7ddf8f5b115a8",
+    "weight_files": [
+      "model.bin"
+    ],
+    "weight_bytes": 1617884929,
+    "license": "mit",
+    "gated": false
+  },
+  {
+    "stage": "Speech tests",
+    "repo": "Systran/faster-whisper-base.en",
+    "revision": "3d3d5dee26484f91867d81cb899cfcf72b96be6c",
+    "weight_files": [
+      "model.bin"
+    ],
+    "weight_bytes": 145216508,
+    "license": "mit",
+    "gated": false
+  },
+  {
+    "stage": "Speech tests",
+    "repo": "Systran/faster-whisper-small.en",
+    "revision": "d1d751a5f8271d482d14ca55d9e2deeebbae577f",
+    "weight_files": [
+      "model.bin"
+    ],
+    "weight_bytes": 483545366,
+    "license": "mit",
+    "gated": false
+  },
+  {
+    "stage": "Speech tests",
+    "repo": "Systran/faster-distil-whisper-large-v3",
+    "revision": "c3058b475261292e64a0412df1d2681c06260fab",
+    "weight_files": [
+      "model.bin"
+    ],
+    "weight_bytes": 1512927867,
+    "license": "mit",
+    "gated": false
+  },
+  {
+    "stage": "Speech tests",
+    "repo": "istupakov/parakeet-tdt-0.6b-v2-onnx",
+    "revision": "0bbb45a3365852604aef28b538a8f066f4ccaa85",
+    "weight_files": [
+      "encoder-model.int8.onnx",
+      "decoder_joint-model.int8.onnx",
+      "encoder-model.onnx",
+      "encoder-model.onnx.data",
+      "decoder_joint-model.onnx",
+      "nemo128.onnx"
+    ],
+    "weight_bytes": 3174305149,
+    "license": "cc-by-4.0",
+    "gated": false
+  },
+  {
+    "stage": "Speech tests",
+    "repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+    "revision": "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce",
+    "weight_files": [
+      "encoder-model.int8.onnx",
+      "decoder_joint-model.int8.onnx",
+      "encoder-model.onnx",
+      "encoder-model.onnx.data",
+      "decoder_joint-model.onnx",
+      "nemo128.onnx"
+    ],
+    "weight_bytes": 3220237686,
+    "license": "cc-by-4.0",
+    "gated": false
+  },
+  {
+    "stage": "Extended formatter tests",
+    "repo": "jncraton/Qwen2.5-1.5B-Instruct-ct2-int8",
+    "revision": "55bb006d27f0b32c8b872a49fecc1d27b5071276",
+    "weight_files": [
+      "model.bin"
+    ],
+    "weight_bytes": 1547075575,
+    "license": "apache-2.0",
+    "gated": false
+  },
+  {
+    "stage": "Extended formatter tests",
+    "repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+    "revision": "7dabda4d13d513e3e842b20f0d435c732f172cbe",
+    "weight_files": [
+      "qwen2.5-3b-instruct-q4_k_m.gguf"
+    ],
+    "weight_bytes": 2104932768,
+    "license": "other",
+    "gated": false
+  },
+  {
+    "stage": "Extended formatter tests",
+    "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "weight_files": [
+      "model.safetensors"
+    ],
+    "weight_bytes": 988097824,
+    "license": "apache-2.0",
+    "gated": false
+  },
+  {
+    "stage": "Extended formatter tests",
+    "repo": "Qwen/Qwen2.5-3B-Instruct",
+    "revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+    "weight_files": [
+      "model-00001-of-00002.safetensors",
+      "model-00002-of-00002.safetensors"
+    ],
+    "weight_bytes": 6171926992,
+    "license": "other",
+    "gated": false
+  },
+  {
+    "stage": "Extended formatter tests",
+    "repo": "Qwen/Qwen3-1.7B-GGUF",
+    "revision": "90862c4b9d2787eaed51d12237eafdfe7c5f6077",
+    "weight_files": [
+      "Qwen3-1.7B-Q8_0.gguf"
+    ],
+    "weight_bytes": 1834426016,
+    "license": "apache-2.0",
+    "gated": false
+  },
+  {
+    "stage": "Optional gated model",
+    "repo": "google/gemma-3-1b-it",
+    "revision": "dcc83ea841ab6100d6b47a070329e1ba4cf78752",
+    "weight_files": [
+      "model.safetensors"
+    ],
+    "weight_bytes": 1999811208,
+    "license": "gemma",
+    "gated": "manual"
+  },
+  {
+    "stage": "Optional gated model",
+    "repo": "meta-llama/Llama-3.2-1B-Instruct",
+    "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+    "weight_files": [
+      "model.safetensors"
+    ],
+    "weight_bytes": 2471645608,
+    "license": "llama3.2",
+    "gated": "manual"
+  }
+]

@@ -1,0 +1,849 @@
+{
+  "checked_utc": "2026-10-18T04:24:24.770789+00:00",
+  "models": [
+    {
+      "repo": "deepdml/faster-whisper-large-v3-turbo-ct2",
+      "revision": "4df90f75321148c3a29a9e2351b7ddf8f5b115a8",
+      "gated": false,
+      "license": "mit",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519
+        },
+        {
+          "path": "README.md",
+          "bytes": 2454
+        },
+        {
+          "path": "config.json",
+          "bytes": 2263
+        },
+        {
+          "path": "model.bin",
+          "bytes": 1617884929
+        },
+        {
+          "path": "preprocessor_config.json",
+          "bytes": 340
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2710337
+        },
+        {
+          "path": "vocabulary.json",
+          "bytes": 1068114
+        }
+      ]
+    },
+    {
+      "repo": "Systran/faster-whisper-base.en",
+      "revision": "3d3d5dee26484f91867d81cb899cfcf72b96be6c",
+      "gated": false,
+      "license": "mit",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1477
+        },
+        {
+          "path": "README.md",
+          "bytes": 1323
+        },
+        {
+          "path": "config.json",
+          "bytes": 2227
+        },
+        {
+          "path": "model.bin",
+          "bytes": 145216508
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2128466
+        },
+        {
+          "path": "vocabulary.txt",
+          "bytes": 422309
+        }
+      ]
+    },
+    {
+      "repo": "Systran/faster-whisper-small.en",
+      "revision": "d1d751a5f8271d482d14ca55d9e2deeebbae577f",
+      "gated": false,
+      "license": "mit",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1477
+        },
+        {
+          "path": "README.md",
+          "bytes": 1330
+        },
+        {
+          "path": "config.json",
+          "bytes": 2657
+        },
+        {
+          "path": "model.bin",
+          "bytes": 483545366
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2128466
+        },
+        {
+          "path": "vocabulary.txt",
+          "bytes": 422309
+        }
+      ]
+    },
+    {
+      "repo": "Systran/faster-distil-whisper-large-v3",
+      "revision": "c3058b475261292e64a0412df1d2681c06260fab",
+      "gated": false,
+      "license": "mit",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1565
+        },
+        {
+          "path": "README.md",
+          "bytes": 1452
+        },
+        {
+          "path": "config.json",
+          "bytes": 2690
+        },
+        {
+          "path": "model.bin",
+          "bytes": 1512927867
+        },
+        {
+          "path": "preprocessor_config.json",
+          "bytes": 340
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2480617
+        },
+        {
+          "path": "vocabulary.json",
+          "bytes": 1068114
+        }
+      ]
+    },
+    {
+      "repo": "nvidia/parakeet-tdt-0.6b-v2",
+      "revision": "ae9ad07059c7c739ffaf932226a8fe64ae2620b0",
+      "gated": false,
+      "license": "cc-by-4.0",
+      "files": [
+        {
+          "path": ".eval_results/open_asr_leaderboard.yaml",
+          "bytes": 2131
+        },
+        {
+          "path": ".gitattributes",
+          "bytes": 1621
+        },
+        {
+          "path": "README.md",
+          "bytes": 23599
+        },
+        {
+          "path": "parakeet-tdt-0.6b-v2.nemo",
+          "bytes": 2472222720
+        }
+      ]
+    },
+    {
+      "repo": "nvidia/parakeet-tdt-0.6b-v3",
+      "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+      "gated": false,
+      "license": "cc-by-4.0",
+      "files": [
+        {
+          "path": ".eval_results/open_asr_leaderboard.yaml",
+          "bytes": 2130
+        },
+        {
+          "path": ".gitattributes",
+          "bytes": 1722
+        },
+        {
+          "path": "README.md",
+          "bytes": 42888
+        },
+        {
+          "path": "config.json",
+          "bytes": 1153
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 289
+        },
+        {
+          "path": "model.safetensors",
+          "bytes": 2508311120
+        },
+        {
+          "path": "parakeet-tdt-0.6b-v3.nemo",
+          "bytes": 2509332480
+        },
+        {
+          "path": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "bytes": 713975456
+        },
+        {
+          "path": "plots/asr.png",
+          "bytes": 114075
+        },
+        {
+          "path": "processor_config.json",
+          "bytes": 392
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 1159960
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 290
+        }
+      ]
+    },
+    {
+      "repo": "istupakov/parakeet-tdt-0.6b-v2-onnx",
+      "revision": "0bbb45a3365852604aef28b538a8f066f4ccaa85",
+      "gated": false,
+      "license": "cc-by-4.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1579
+        },
+        {
+          "path": "README.md",
+          "bytes": 1027
+        },
+        {
+          "path": "config.json",
+          "bytes": 97
+        },
+        {
+          "path": "decoder_joint-model.int8.onnx",
+          "bytes": 8998286
+        },
+        {
+          "path": "decoder_joint-model.onnx",
+          "bytes": 35792059
+        },
+        {
+          "path": "encoder-model.int8.onnx",
+          "bytes": 652184014
+        },
+        {
+          "path": "encoder-model.onnx",
+          "bytes": 41770866
+        },
+        {
+          "path": "encoder-model.onnx.data",
+          "bytes": 2435420160
+        },
+        {
+          "path": "nemo128.onnx",
+          "bytes": 139764
+        },
+        {
+          "path": "vocab.txt",
+          "bytes": 9384
+        }
+      ]
+    },
+    {
+      "repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+      "revision": "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce",
+      "gated": false,
+      "license": "cc-by-4.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1579
+        },
+        {
+          "path": "README.md",
+          "bytes": 1207
+        },
+        {
+          "path": "config.json",
+          "bytes": 97
+        },
+        {
+          "path": "decoder_joint-model.int8.onnx",
+          "bytes": 18202004
+        },
+        {
+          "path": "decoder_joint-model.onnx",
+          "bytes": 72520893
+        },
+        {
+          "path": "encoder-model.int8.onnx",
+          "bytes": 652183999
+        },
+        {
+          "path": "encoder-model.onnx",
+          "bytes": 41770866
+        },
+        {
+          "path": "encoder-model.onnx.data",
+          "bytes": 2435420160
+        },
+        {
+          "path": "nemo128.onnx",
+          "bytes": 139764
+        },
+        {
+          "path": "vocab.txt",
+          "bytes": 93939
+        }
+      ]
+    },
+    {
+      "repo": "jncraton/Qwen2.5-1.5B-Instruct-ct2-int8",
+      "revision": "55bb006d27f0b32c8b872a49fecc1d27b5071276",
+      "gated": false,
+      "license": "apache-2.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519
+        },
+        {
+          "path": "README.md",
+          "bytes": 5111
+        },
+        {
+          "path": "config.json",
+          "bytes": 147
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 242
+        },
+        {
+          "path": "model.bin",
+          "bytes": 1547075575
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 7031645
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 7305
+        },
+        {
+          "path": "vocabulary.json",
+          "bytes": 3861164
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+      "gated": false,
+      "license": "apache-2.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1561
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 11343
+        },
+        {
+          "path": "README.md",
+          "bytes": 4856
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-fp16.gguf",
+          "bytes": 3560416288
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q2_k.gguf",
+          "bytes": 752880160
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q3_k_m.gguf",
+          "bytes": 924455968
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q4_0.gguf",
+          "bytes": 1066227232
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+          "bytes": 1117320736
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q5_0.gguf",
+          "bytes": 1259173408
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q5_k_m.gguf",
+          "bytes": 1285494304
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q6_k.gguf",
+          "bytes": 1464178720
+        },
+        {
+          "path": "qwen2.5-1.5b-instruct-q8_0.gguf",
+          "bytes": 1894532128
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+      "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+      "gated": false,
+      "license": "apache-2.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1561
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 11343
+        },
+        {
+          "path": "README.md",
+          "bytes": 4856
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-fp16.gguf",
+          "bytes": 1266425696
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q2_k.gguf",
+          "bytes": 415182688
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q3_k_m.gguf",
+          "bytes": 432041824
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q4_0.gguf",
+          "bytes": 428730208
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+          "bytes": 491400032
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q5_0.gguf",
+          "bytes": 490475360
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q5_k_m.gguf",
+          "bytes": 522186592
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q6_k.gguf",
+          "bytes": 650379104
+        },
+        {
+          "path": "qwen2.5-0.5b-instruct-q8_0.gguf",
+          "bytes": 675710816
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "gated": false,
+      "license": "apache-2.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 11343
+        },
+        {
+          "path": "README.md",
+          "bytes": 4917
+        },
+        {
+          "path": "config.json",
+          "bytes": 659
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 242
+        },
+        {
+          "path": "merges.txt",
+          "bytes": 1671839
+        },
+        {
+          "path": "model.safetensors",
+          "bytes": 988097824
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 7031645
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 7305
+        },
+        {
+          "path": "vocab.json",
+          "bytes": 2776833
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+      "revision": "7dabda4d13d513e3e842b20f0d435c732f172cbe",
+      "gated": false,
+      "license": "other",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1561
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 7388
+        },
+        {
+          "path": "README.md",
+          "bytes": 4867
+        },
+        {
+          "path": "qwen2.5-3b-instruct-fp16-00001-of-00002.gguf",
+          "bytes": 3980517664
+        },
+        {
+          "path": "qwen2.5-3b-instruct-fp16-00002-of-00002.gguf",
+          "bytes": 2820129120
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q2_k.gguf",
+          "bytes": 1376856480
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q3_k_m.gguf",
+          "bytes": 1724178848
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q4_0.gguf",
+          "bytes": 1997879712
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q4_k_m.gguf",
+          "bytes": 2104932768
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q5_0.gguf",
+          "bytes": 2383591840
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q5_k_m.gguf",
+          "bytes": 2438740384
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q6_k.gguf",
+          "bytes": 2793410976
+        },
+        {
+          "path": "qwen2.5-3b-instruct-q8_0.gguf",
+          "bytes": 3616088480
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen2.5-3B-Instruct",
+      "revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "gated": false,
+      "license": "other",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 7388
+        },
+        {
+          "path": "README.md",
+          "bytes": 4930
+        },
+        {
+          "path": "config.json",
+          "bytes": 661
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 242
+        },
+        {
+          "path": "merges.txt",
+          "bytes": 1671839
+        },
+        {
+          "path": "model-00001-of-00002.safetensors",
+          "bytes": 3968658944
+        },
+        {
+          "path": "model-00002-of-00002.safetensors",
+          "bytes": 2203268048
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "bytes": 35581
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 7031645
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 7305
+        },
+        {
+          "path": "vocab.json",
+          "bytes": 2776833
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen3-0.6B-GGUF",
+      "revision": "23749fefcc72300e3a2ad315e1317431b06b590a",
+      "gated": false,
+      "license": "apache-2.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1808
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 11544
+        },
+        {
+          "path": "Qwen3-0.6B-Q8_0.gguf",
+          "bytes": 639446688
+        },
+        {
+          "path": "README.md",
+          "bytes": 6236
+        },
+        {
+          "path": "params",
+          "bytes": 270
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen3-1.7B-GGUF",
+      "revision": "90862c4b9d2787eaed51d12237eafdfe7c5f6077",
+      "gated": false,
+      "license": "apache-2.0",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1874
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 11544
+        },
+        {
+          "path": "Qwen3-1.7B-Q8_0.gguf",
+          "bytes": 1834426016
+        },
+        {
+          "path": "README.md",
+          "bytes": 6235
+        },
+        {
+          "path": "params",
+          "bytes": 270
+        }
+      ]
+    },
+    {
+      "repo": "google/gemma-3-1b-it",
+      "revision": "dcc83ea841ab6100d6b47a070329e1ba4cf78752",
+      "gated": "manual",
+      "license": "gemma",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1676
+        },
+        {
+          "path": "README.md",
+          "bytes": 24265
+        },
+        {
+          "path": "added_tokens.json",
+          "bytes": 35
+        },
+        {
+          "path": "config.json",
+          "bytes": 899
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 215
+        },
+        {
+          "path": "model.safetensors",
+          "bytes": 1999811208
+        },
+        {
+          "path": "special_tokens_map.json",
+          "bytes": 662
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 33384568
+        },
+        {
+          "path": "tokenizer.model",
+          "bytes": 4689074
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 1156999
+        }
+      ]
+    },
+    {
+      "repo": "meta-llama/Llama-3.2-1B-Instruct",
+      "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+      "gated": "manual",
+      "license": "llama3.2",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519
+        },
+        {
+          "path": "LICENSE.txt",
+          "bytes": 7712
+        },
+        {
+          "path": "README.md",
+          "bytes": 41742
+        },
+        {
+          "path": "USE_POLICY.md",
+          "bytes": 6021
+        },
+        {
+          "path": "config.json",
+          "bytes": 877
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 189
+        },
+        {
+          "path": "model.safetensors",
+          "bytes": 2471645608
+        },
+        {
+          "path": "original/consolidated.00.pth",
+          "bytes": 2471677246
+        },
+        {
+          "path": "original/params.json",
+          "bytes": 220
+        },
+        {
+          "path": "original/tokenizer.model",
+          "bytes": 2183982
+        },
+        {
+          "path": "special_tokens_map.json",
+          "bytes": 296
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 9085657
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 54528
+        }
+      ]
+    },
+    {
+      "repo": "rabden/t5-tiny-gec-hone",
+      "revision": "d5f27b81d5316bd689977d722d3ed513bbb9122c",
+      "gated": false,
+      "license": "mit",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519
+        },
+        {
+          "path": "README.md",
+          "bytes": 2135
+        },
+        {
+          "path": "config.json",
+          "bytes": 1089
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 225
+        },
+        {
+          "path": "onnx/decoder_model_merged.onnx",
+          "bytes": 82729977
+        },
+        {
+          "path": "onnx/decoder_model_merged_quantized.onnx",
+          "bytes": 20906227
+        },
+        {
+          "path": "onnx/encoder_model.onnx",
+          "bytes": 45561259
+        },
+        {
+          "path": "onnx/encoder_model_quantized.onnx",
+          "bytes": 11507979
+        },
+        {
+          "path": "special_tokens_map.json",
+          "bytes": 2201
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2422164
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 2425
+        }
+      ]
+    }
+  ]
+}

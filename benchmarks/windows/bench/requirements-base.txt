@@ -1,0 +1,14 @@
+numpy==2.2.6
+faster-whisper==1.2.0
+ctranslate2==4.6.0
+huggingface-hub==0.34.4
+tokenizers==0.21.4
+llama-cpp-python==0.3.19
+psutil==7.0.0
+jiwer==4.0.0
+openai-whisper==20250625
+PyYAML==6.0.2
+matplotlib==3.10.5
+soundfile==0.13.1
+onnx-asr==0.10.0
+nvidia-ml-py==12.575.51; sys_platform == "win32"

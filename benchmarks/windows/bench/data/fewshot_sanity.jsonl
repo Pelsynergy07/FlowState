@@ -1,0 +1,4 @@
+{"id": "sanity-0", "input": "so i need to buy groceries number one milk number two eggs number three bread and also call the plumber", "expected": "So I need to buy groceries:\n1. Milk\n2. Eggs\n3. Bread\n\nAnd also call the plumber.", "scored": false}
+{"id": "sanity-1", "input": "hey john hope you're doing well um I wanted to follow up on the budget meeting can we talk tomorrow thanks sarah", "expected": "Hey John,\n\nHope you're doing well. I wanted to follow up on the budget meeting. Can we talk tomorrow?\n\nThanks,\nSarah", "scored": false}
+{"id": "sanity-2", "input": "here are the findings first the dates are wrong next one is that sync fails and the the targets are incorrect", "expected": "Here are the findings:\n- The dates are wrong\n- Sync fails\n- The targets are incorrect", "scored": false}
+{"id": "sanity-3", "input": "can you fix the login page it's broken on mobile", "expected": "Can you fix the login page? It's broken on mobile.", "scored": false}

@@ -1,0 +1,451 @@
+source_commit: 6c465c16b67910f5fc449c2dcf86ed426183c80c
+python: '3.12'
+seeds:
+  public_subset: 1729
+  bootstrap: 1729
+  blind_review: 1729
+  synthetic_noise: 1729
+budgets_seconds:
+  live: 8.0
+  finish: 4.0
+  default_polish: 3.5
+  generous_quality: 600.0
+streaming:
+  step_seconds: 10.0
+  overlap_seconds: 6.0
+  lookahead_seconds: 4.0
+  pause_seconds: 0.25
+  stop_grace_seconds: 1.0
+formatter:
+  chunk_tokens: 220
+  cpu_max_words: 60
+  modes:
+  - shipped
+  - unlimited
+  repeat_passes: 2
+speed:
+  warmups: 3
+  timed_runs: 10
+  protocol: speed-v2-natural-prose
+  cold_after_reboot: not measured
+hardware_tiers:
+  t1: Windows RTX 2070 CUDA
+  t2: same Windows CPU only, four threads
+  t3: this Mac, CPU baseline; native CoreML future-port conditions separate
+  t4: optional actual low-end Windows laptop
+model_manifest:
+- stage: First formatter tests
+  repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+  revision: 91cad51170dc346986eccefdc2dd33a9da36ead9
+  weight_files:
+  - qwen2.5-1.5b-instruct-q4_k_m.gguf
+  weight_bytes: 1117320736
+  license: apache-2.0
+  gated: false
+- stage: First formatter tests
+  repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+  revision: 9217f5db79a29953eb74d5343926648285ec7e67
+  weight_files:
+  - qwen2.5-0.5b-instruct-q4_k_m.gguf
+  - qwen2.5-0.5b-instruct-q8_0.gguf
+  weight_bytes: 1167110848
+  license: apache-2.0
+  gated: false
+- stage: First formatter tests
+  repo: Qwen/Qwen3-0.6B-GGUF
+  revision: 23749fefcc72300e3a2ad315e1317431b06b590a
+  weight_files:
+  - Qwen3-0.6B-Q8_0.gguf
+  weight_bytes: 639446688
+  license: apache-2.0
+  gated: false
+- stage: First formatter tests
+  repo: rabden/t5-tiny-gec-hone
+  revision: d5f27b81d5316bd689977d722d3ed513bbb9122c
+  weight_files:
+  - onnx/encoder_model_quantized.onnx
+  - onnx/decoder_model_merged_quantized.onnx
+  weight_bytes: 32414206
+  license: mit
+  gated: false
+- stage: Speech tests
+  repo: deepdml/faster-whisper-large-v3-turbo-ct2
+  revision: 4df90f75321148c3a29a9e2351b7ddf8f5b115a8
+  weight_files:
+  - model.bin
+  weight_bytes: 1617884929
+  license: mit
+  gated: false
+- stage: Speech tests
+  repo: Systran/faster-whisper-base.en
+  revision: 3d3d5dee26484f91867d81cb899cfcf72b96be6c
+  weight_files:
+  - model.bin
+  weight_bytes: 145216508
+  license: mit
+  gated: false
+- stage: Speech tests
+  repo: Systran/faster-whisper-small.en
+  revision: d1d751a5f8271d482d14ca55d9e2deeebbae577f
+  weight_files:
+  - model.bin
+  weight_bytes: 483545366
+  license: mit
+  gated: false
+- stage: Speech tests
+  repo: Systran/faster-distil-whisper-large-v3
+  revision: c3058b475261292e64a0412df1d2681c06260fab
+  weight_files:
+  - model.bin
+  weight_bytes: 1512927867
+  license: mit
+  gated: false
+- stage: Speech tests
+  repo: istupakov/parakeet-tdt-0.6b-v2-onnx
+  revision: 0bbb45a3365852604aef28b538a8f066f4ccaa85
+  weight_files:
+  - encoder-model.int8.onnx
+  - decoder_joint-model.int8.onnx
+  - encoder-model.onnx
+  - encoder-model.onnx.data
+  - decoder_joint-model.onnx
+  - nemo128.onnx
+  weight_bytes: 3174305149
+  license: cc-by-4.0
+  gated: false
+- stage: Speech tests
+  repo: istupakov/parakeet-tdt-0.6b-v3-onnx
+  revision: 8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce
+  weight_files:
+  - encoder-model.int8.onnx
+  - decoder_joint-model.int8.onnx
+  - encoder-model.onnx
+  - encoder-model.onnx.data
+  - decoder_joint-model.onnx
+  - nemo128.onnx
+  weight_bytes: 3220237686
+  license: cc-by-4.0
+  gated: false
+- stage: Extended formatter tests
+  repo: jncraton/Qwen2.5-1.5B-Instruct-ct2-int8
+  revision: 55bb006d27f0b32c8b872a49fecc1d27b5071276
+  weight_files:
+  - model.bin
+  weight_bytes: 1547075575
+  license: apache-2.0
+  gated: false
+- stage: Extended formatter tests
+  repo: Qwen/Qwen2.5-3B-Instruct-GGUF
+  revision: 7dabda4d13d513e3e842b20f0d435c732f172cbe
+  weight_files:
+  - qwen2.5-3b-instruct-q4_k_m.gguf
+  weight_bytes: 2104932768
+  license: other
+  gated: false
+- stage: Extended formatter tests
+  repo: Qwen/Qwen2.5-0.5B-Instruct
+  revision: 7ae557604adf67be50417f59c2c2f167def9a775
+  weight_files:
+  - model.safetensors
+  weight_bytes: 988097824
+  license: apache-2.0
+  gated: false
+- stage: Extended formatter tests
+  repo: Qwen/Qwen2.5-3B-Instruct
+  revision: aa8e72537993ba99e69dfaafa59ed015b17504d1
+  weight_files:
+  - model-00001-of-00002.safetensors
+  - model-00002-of-00002.safetensors
+  weight_bytes: 6171926992
+  license: other
+  gated: false
+- stage: Extended formatter tests
+  repo: Qwen/Qwen3-1.7B-GGUF
+  revision: 90862c4b9d2787eaed51d12237eafdfe7c5f6077
+  weight_files:
+  - Qwen3-1.7B-Q8_0.gguf
+  weight_bytes: 1834426016
+  license: apache-2.0
+  gated: false
+- stage: Optional gated model
+  repo: google/gemma-3-1b-it
+  revision: dcc83ea841ab6100d6b47a070329e1ba4cf78752
+  weight_files:
+  - model.safetensors
+  weight_bytes: 1999811208
+  license: gemma
+  gated: manual
+- stage: Optional gated model
+  repo: meta-llama/Llama-3.2-1B-Instruct
+  revision: 9213176726f574b556790deb65791e0c5aa438b6
+  weight_files:
+  - model.safetensors
+  weight_bytes: 2471645608
+  license: llama3.2
+  gated: manual
+formatter_ids:
+  t5-tiny:
+    repo: rabden/t5-tiny-gec-hone
+    file: null
+  qwen15-q4:
+    repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+    file: qwen2.5-1.5b-instruct-q4_k_m.gguf
+  qwen05-q4:
+    repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    file: qwen2.5-0.5b-instruct-q4_k_m.gguf
+  qwen05-q8:
+    repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    file: qwen2.5-0.5b-instruct-q8_0.gguf
+  qwen3-06-q8:
+    repo: Qwen/Qwen3-0.6B-GGUF
+    file: Qwen3-0.6B-Q8_0.gguf
+  qwen3-17-q8:
+    repo: Qwen/Qwen3-1.7B-GGUF
+    file: Qwen3-1.7B-Q8_0.gguf
+  qwen25-3-q4:
+    repo: Qwen/Qwen2.5-3B-Instruct-GGUF
+    file: qwen2.5-3b-instruct-q4_k_m.gguf
+  qwen15-ct2:
+    repo: jncraton/Qwen2.5-1.5B-Instruct-ct2-int8
+    file: null
+  qwen05-ct2:
+    repo: Qwen/Qwen2.5-0.5B-Instruct
+    file: null
+  qwen25-3-ct2:
+    repo: Qwen/Qwen2.5-3B-Instruct
+    file: null
+asr_ids:
+  parakeet-coreml-v2: FluidInference/parakeet-tdt-0.6b-v2-coreml
+  parakeet-coreml-v3: FluidInference/parakeet-tdt-0.6b-v3-coreml
+  parakeet-coreml-v3-int4: FluidInference/parakeet-tdt-0.6b-v3-coreml
+  parakeet-coreml-v3-int8v2: FluidInference/parakeet-tdt-0.6b-v3-coreml
+  parakeet-coreml-redux: FluidInference/parakeet-redux-coreml
+  whisper-turbo: deepdml/faster-whisper-large-v3-turbo-ct2
+  whisper-base: Systran/faster-whisper-base.en
+  whisper-small: Systran/faster-whisper-small.en
+  whisper-distil: Systran/faster-distil-whisper-large-v3
+  parakeet-v2-int8: istupakov/parakeet-tdt-0.6b-v2-onnx
+  parakeet-v2-fp32: istupakov/parakeet-tdt-0.6b-v2-onnx
+  parakeet-v3-int8: istupakov/parakeet-tdt-0.6b-v3-onnx
+  parakeet-v3-fp32: istupakov/parakeet-tdt-0.6b-v3-onnx
+privacy:
+  audio_uploads: false
+  localappdata: .appdata
+  app_repository_access: read-only
+native_models:
+- repo: FluidInference/parakeet-tdt-0.6b-v2-coreml
+  revision: ee09c569f73759e6d44c9bd16766f477b2b36d39
+  files:
+  - path: Decoder.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 46de1a6fe2e49d19a2125bc91acf020df7f2aea84ba821532aade8427a440b05
+  - path: Decoder.mlmodelc/coremldata.bin
+    bytes: 554
+    sha256: d200ca07694a347f6d02a3886a062ae839831e094e443222f2e48a14945966a8
+  - path: Decoder.mlmodelc/metadata.json
+    bytes: 3427
+    sha256: 90a279b822496316458febc0ce761ab05954fadd9d66aa97bea077a35fc8f2b2
+  - path: Decoder.mlmodelc/model.mil
+    bytes: 13106
+    sha256: 7b95a5a6b672c652000348a67b6d4d92bb8e176b978c6666fe73c28a4d7ec579
+  - path: Decoder.mlmodelc/weights/weight.bin
+    bytes: 14429952
+    sha256: 27d26890221d82322c1092fd99d7b40578e435d5cf4b83c887c42603caf97aba
+  - path: Encoder.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 42e638870d73f26b332918a3496ce36793fbb413a81cbd3d16ba01328637a105
+  - path: Encoder.mlmodelc/coremldata.bin
+    bytes: 485
+    sha256: 4def7aa848599ad0e17a8b9a982edcdbf33cf92e1f4b798de32e2ca0bc74b030
+  - path: Encoder.mlmodelc/metadata.json
+    bytes: 2926
+    sha256: 58222fbc48c13c49d9715567803cd50cb9c23e4360462e0f8ffcea59a2c73c63
+  - path: Encoder.mlmodelc/model.mil
+    bytes: 959769
+    sha256: ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808
+  - path: Encoder.mlmodelc/weights/weight.bin
+    bytes: 445187200
+    sha256: 4adc7ad44f9d05e1bffeb2b06d3bb02861a5c7602dff63a6b494aed3bf8a6c3e
+  - path: JointDecision.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: f1183ba213bb94a918c8d2cad19ab045320618f97f6ca662245b3936d7b090f7
+  - path: JointDecision.mlmodelc/coremldata.bin
+    bytes: 534
+    sha256: e2c6752f1c8cf2d3f6f26ec93195c9bfa759ad59edf9f806696a138154f96f11
+  - path: JointDecision.mlmodelc/metadata.json
+    bytes: 2936
+    sha256: ba8d309417b9acd4a175fdb15687de6a941db2f5b06666a60e7cf3cc8e2d3c3c
+  - path: JointDecision.mlmodelc/model.mil
+    bytes: 9722
+    sha256: 93bf82042235127cb81ab537dcae47a1c2e7e242ce4ffdaf772981b45eedc4f0
+  - path: JointDecision.mlmodelc/weights/weight.bin
+    bytes: 3453388
+    sha256: ca22a65903a05e64137677da608077578a8606090a598abf4875fa6199aaa19d
+  - path: Preprocessor.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 03ab3c1327a054c54c07a40325db967ec574f2c91dcc8192bfa44aa561bcf2d8
+  - path: Preprocessor.mlmodelc/coremldata.bin
+    bytes: 494
+    sha256: d88ea1fc349459c9e100d6a96688c5b29a1f0d865f544be103001724b986b6d6
+  - path: Preprocessor.mlmodelc/metadata.json
+    bytes: 2974
+    sha256: fb16c581ff5e1b962e7cb2181ed892cd32f9f84c12b6e80ff3e089f28e35bcbb
+  - path: Preprocessor.mlmodelc/model.mil
+    bytes: 27166
+    sha256: 3e06d16fd061294c8a75be68c43a3b1ed1f593d4a9c35249e9cdbccadc59721e
+  - path: Preprocessor.mlmodelc/weights/weight.bin
+    bytes: 298880
+    sha256: a5f7df6c7f47147ae9486fe18cc7792f9a44d093ec3c6a11e91ef2dc363c48dc
+  - path: parakeet_vocab.json
+    bytes: 18762
+    sha256: 57019fe3c745772ca83a1b048a4bb951cd51329504ea33d4d83316b96e279a97
+- repo: FluidInference/parakeet-tdt-0.6b-v3-coreml
+  revision: 7dd20fe6b1797d35f5e3307e8b1732d9a178edfe
+  files:
+  - path: Decoder.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 4238c4e81ecd0dc94bd7dfbb60f7e2cc824107c1ffe0387b8607b72833dba350
+  - path: Decoder.mlmodelc/coremldata.bin
+    bytes: 554
+    sha256: 18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99
+  - path: Decoder.mlmodelc/metadata.json
+    bytes: 3427
+    sha256: a39e93cd8371b8ded92635c7804fcd0590f0d1dd9415c6d19a0484be073077d9
+  - path: Decoder.mlmodelc/model.mil
+    bytes: 13110
+    sha256: ef2a0a281695398a62fde86ac269c68f73d5b578d7ed3b31f2ba91a2d1ea1f35
+  - path: Decoder.mlmodelc/weights/weight.bin
+    bytes: 23604992
+    sha256: 48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41
+  - path: Encoder.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 42e638870d73f26b332918a3496ce36793fbb413a81cbd3d16ba01328637a105
+  - path: Encoder.mlmodelc/coremldata.bin
+    bytes: 485
+    sha256: d48034a167a82e88fc3df64f60af963ab3983538271175b8319e7d5720a0fb86
+  - path: Encoder.mlmodelc/metadata.json
+    bytes: 2921
+    sha256: da24da9cca943fb29d7fa8e376d57fca7cb3aa08ca51b956b0b0e56813f087e9
+  - path: Encoder.mlmodelc/model.mil
+    bytes: 959769
+    sha256: ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808
+  - path: Encoder.mlmodelc/weights/weight.bin
+    bytes: 445187200
+    sha256: e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421
+  - path: EncoderInt4.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: c296e0229ab5e32412fda92f8dcf47f0e63f0c34e343c0e2654f6c37649d2d79
+  - path: EncoderInt4.mlmodelc/coremldata.bin
+    bytes: 512
+    sha256: 3e6539cd5d5f1c3bd5a01921cd94af85eab609d49d47e1436a16faac958754d6
+  - path: EncoderInt4.mlmodelc/metadata.json
+    bytes: 2954
+    sha256: 77cc9bf9b66724b1d8f10d10cc963894136c7f5768746df2967261bd75146423
+  - path: EncoderInt4.mlmodelc/model.mil
+    bytes: 874445
+    sha256: e01525a428acf1c62ae952f6951c80d8608c1164394eed547fb37c03886510ff
+  - path: EncoderInt4.mlmodelc/weights/weight.bin
+    bytes: 297912320
+    sha256: 6fcf5596562948c7482e116bdb3f364279bed970893b86737b67fe89f36367d9
+  - path: Encoder_v2.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: af98d71151609799efbbffc00112fcba4bd91adf0b01135a982c574e91822f9c
+  - path: Encoder_v2.mlmodelc/coremldata.bin
+    bytes: 478
+    sha256: 70628bd4fd25fb554cc0cebc31356723930c885480132bf3ecd1b5dbe71dd0a2
+  - path: Encoder_v2.mlmodelc/model.mil
+    bytes: 1002653
+    sha256: abc621390840dd064e6833dc098101706621e47e17119ead904f8c383211dd1d
+  - path: Encoder_v2.mlmodelc/weights/weight.bin
+    bytes: 594211328
+    sha256: 8d2c79e15a4545e08fe3a21fe741e42b8bf24329db81de8fdfacd92388ea5a66
+  - path: JointDecisionv3.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 26def4bf73dd56d29dee21c8ef97cb8969e62f6120ed1adc91e46828e2737b6c
+  - path: JointDecisionv3.mlmodelc/coremldata.bin
+    bytes: 521
+    sha256: f5fc08b741400f0088492c9e839418b1e18522f19cba28d361dd030c5f398342
+  - path: JointDecisionv3.mlmodelc/metadata.json
+    bytes: 3453
+    sha256: d9307211b9a37e0f0ac260c7660b1571a3de25841035cfdf9b58fd40425f890f
+  - path: JointDecisionv3.mlmodelc/model.mil
+    bytes: 11775
+    sha256: be60732943389a047175111a83f8839f3eb39d4803adafa828a0871b2f39818d
+  - path: JointDecisionv3.mlmodelc/weights/weight.bin
+    bytes: 12642764
+    sha256: 4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e
+  - path: Preprocessor.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: c9beeb989c8d66f8be11df59bc6df277ec76cee404f6865b46243835ef562f6d
+  - path: Preprocessor.mlmodelc/coremldata.bin
+    bytes: 486
+    sha256: dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d
+  - path: Preprocessor.mlmodelc/metadata.json
+    bytes: 2841
+    sha256: 2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf
+  - path: Preprocessor.mlmodelc/model.mil
+    bytes: 28181
+    sha256: 4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93
+  - path: Preprocessor.mlmodelc/weights/weight.bin
+    bytes: 491072
+    sha256: 129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea
+  - path: parakeet_vocab.json
+    bytes: 151122
+    sha256: 7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735
+- repo: FluidInference/parakeet-redux-coreml
+  revision: 8c5ef97a29cd120dc76b354b3f22b7fec3b486f9
+  files:
+  - path: Decoder.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 7f24e7248d57024c6f1c5a2ea306f4a6a89db45a363218523bb6410c4b1aecf0
+  - path: Decoder.mlmodelc/coremldata.bin
+    bytes: 560
+    sha256: 422da51d983e93a3e48cd6d46a17d6c32844452414c8e242fb0caaca2b8af5ed
+  - path: Decoder.mlmodelc/model.mil
+    bytes: 13110
+    sha256: 956f600207f88396017ca5c96cfa3acd5bfee60835a5b44b762e033a8fb28955
+  - path: Decoder.mlmodelc/weights/weight.bin
+    bytes: 23604992
+    sha256: 6c6c88c23ee5492a6b229e8cc636ddadb2b01ae0dd559d9cb63123bebf507d77
+  - path: Encoder.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: 7862e972e09315df099d4bfd320743bf106acbf7fe4343317f9de45b0635d7b7
+  - path: Encoder.mlmodelc/coremldata.bin
+    bytes: 506
+    sha256: ca0b212fe3c06c3ccd35e508fa61e4dfaad19dd0c55b82e4f5bf8711e7758fd9
+  - path: Encoder.mlmodelc/model.mil
+    bytes: 965906
+    sha256: 165487e314ed93c4a44dfec99d57be4e436e7c3dba6eef49fd3f0daf9de6d0d4
+  - path: Encoder.mlmodelc/weights/weight.bin
+    bytes: 182389312
+    sha256: adbb5550dc6488717d3a1407b53122fbdb1af5e99c330ee20f8d8cfd9ec49252
+  - path: JointDecisionv3.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: fc857a756b8c9c9f31aa9e1062766cc0a82ac035ef369d6e1cbe97184921479c
+  - path: JointDecisionv3.mlmodelc/coremldata.bin
+    bytes: 592
+    sha256: 611ea653e2adede7cc1cfe70da36296844f97e95e2c7dd961d45230e5599389d
+  - path: JointDecisionv3.mlmodelc/model.mil
+    bytes: 11777
+    sha256: 791b3c3cf3eb2079c84623fc880f6bba008d1366e5f8b03e9a8ed8bd4d7194a0
+  - path: JointDecisionv3.mlmodelc/weights/weight.bin
+    bytes: 12642764
+    sha256: 73b0288acd115fc4c36038f66b6cbf49233182488febf5d8c787bea4009535f7
+  - path: Preprocessor.mlmodelc/analytics/coremldata.bin
+    bytes: 243
+    sha256: c9beeb989c8d66f8be11df59bc6df277ec76cee404f6865b46243835ef562f6d
+  - path: Preprocessor.mlmodelc/coremldata.bin
+    bytes: 486
+    sha256: dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d
+  - path: Preprocessor.mlmodelc/metadata.json
+    bytes: 2841
+    sha256: 2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf
+  - path: Preprocessor.mlmodelc/model.mil
+    bytes: 28181
+    sha256: 4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93
+  - path: Preprocessor.mlmodelc/weights/weight.bin
+    bytes: 491072
+    sha256: 129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea
+  - path: parakeet_vocab.json
+    bytes: 151122
+    sha256: 7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735
