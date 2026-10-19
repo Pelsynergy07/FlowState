@@ -10,7 +10,7 @@
 
 ### *High-speed, 100% offline voice dictation with screen-context grounding for Windows and macOS.*
 
-[**Download for Windows**](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowStateSetup.exe) • [**Download for Mac**](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowState-macOS.dmg) • [**Website**](https://runflowstate.vercel.app/) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
+[**Download for Windows**](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowStateSetup.exe) • [**Download for Mac**](https://github.com/Pelsynergy07/FlowState/releases/latest/download/FlowState-macOS.dmg) • [**Website**](https://runflowstate.vercel.app/) ([source](https://github.com/Pelsynergy07/FlowState-Website)) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
 </div>
 

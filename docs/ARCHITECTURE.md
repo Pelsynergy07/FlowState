@@ -117,3 +117,7 @@ Android won't run the PySide6 shell, but it can share everything below it:
 
 Release assets per platform are named in `update_check.INSTALLER_ASSET_NAMES`;
 attach both to the same GitHub release so each app finds its own update.
+The website's download buttons (repository
+[FlowState-Website](https://github.com/Pelsynergy07/FlowState-Website))
+link to `releases/latest/download/FlowStateSetup.exe` and
+`releases/latest/download/FlowState-macOS.dmg`, so every release needs both.
