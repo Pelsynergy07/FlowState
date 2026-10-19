@@ -19,12 +19,13 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs, collect_submodules
 
 block_cipher = None
 
 PROJECT_ROOT = Path(SPECPATH).resolve().parent
 SRC_DIR = PROJECT_ROOT / "src"
+sys.path.insert(0, str(SRC_DIR))  # lets collect_submodules find flowstate
 
 datas = []
 binaries = []
@@ -54,6 +55,10 @@ for pkg in (
 # packages, so their bin/ folders are added explicitly.
 for nvidia_pkg in ("nvidia.cublas", "nvidia.cudnn", "nvidia.cuda_runtime", "nvidia.cuda_nvrtc"):
     binaries += collect_dynamic_libs(nvidia_pkg)
+
+# Platform adapters are imported by name at runtime (platform.adapter()),
+# which static analysis can't see.
+hiddenimports += collect_submodules("flowstate.platform")
 
 # flowstate's own bundled data (vocabulary json etc).
 datas += [(str(SRC_DIR / "flowstate" / "resources"), "flowstate/resources")]

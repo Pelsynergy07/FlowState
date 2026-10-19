@@ -1,0 +1,27 @@
+# FlowState on macOS (Apple silicon, macOS 14+), Python 3.12.
+#
+#   python3.12 -m venv .venv
+#   CMAKE_ARGS="-DGGML_METAL=on" .venv/bin/pip install -r requirements-macos.txt
+#
+# llama-cpp-python is built from source here so it gets the Metal (Apple
+# GPU) backend; the CPU wheel index used on Windows has no Metal build.
+# Speech runs through the Parakeet helper (native/macos, built with Swift
+# by packaging/build_macos.sh) with MLX Whisper as the fallback.
+
+PySide6>=6.7
+faster-whisper>=1.0
+sounddevice>=0.4.6
+numpy>=1.26,<3
+mss>=9.0
+pillow>=10.3
+pynput>=1.7.6
+huggingface_hub>=0.23
+llama-cpp-python>=0.3,<=0.3.19
+mlx-whisper>=0.4
+pyobjc-framework-Quartz>=10.3
+pyobjc-framework-Cocoa>=10.3
+pyobjc-framework-AVFoundation>=10.3
+pyobjc-framework-ApplicationServices>=10.3
+
+pytest>=8.2
+pyinstaller>=6.10

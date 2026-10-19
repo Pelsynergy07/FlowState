@@ -3,12 +3,12 @@
 <div align="center">
 
 [![Release](https://img.shields.io/badge/Release-v1.0.4--beta-blue.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/tag/v1.0.4-beta)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=for-the-badge&logo=windows)](https://github.com/Pelsynergy07/FlowState/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20%7C%20macOS%2014%2B-0078D4.svg?style=for-the-badge)](https://github.com/Pelsynergy07/FlowState/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Privacy](https://img.shields.io/badge/Privacy-Local%20Dictation%20%7C%20Opt--in%20Stats-10B981.svg?style=for-the-badge)](HOW_IT_WORKS.md)
 
-### *High-speed, 100% offline voice dictation with screen-context grounding for Windows.*
+### *High-speed, 100% offline voice dictation with screen-context grounding for Windows and macOS.*
 
 [**Download Installer (v1.0.4 Beta)**](https://github.com/Pelsynergy07/FlowState/releases/download/v1.0.4-beta/FlowStateSetup.exe) • [**How It Works**](HOW_IT_WORKS.md) • [**Contributing**](CONTRIBUTING.md)
 
@@ -41,6 +41,18 @@ Grab the standalone setup installer from our latest release:
   * **GPU Mode (Recommended)**: NVIDIA GPU with CUDA support runs Whisper `large-v3-turbo` for near-instant transcription.
   * **CPU Mode**: Automatic fallback to lightweight Whisper `base.en` on multi-core CPUs.
 * **No Prerequisites**: No Python, CUDA toolkits, or external dependencies required. The installer is completely self-contained.
+
+### macOS (Apple silicon)
+
+Download `FlowState-<version>.dmg` from the latest release, drag **FlowState** into **Applications**, and open it. FlowState lives in the menu bar.
+
+* **System Requirements**: macOS 14 Sonoma or later on Apple silicon (M1 or newer).
+* **Speech**: NVIDIA Parakeet v2 on the Apple Neural Engine (English, about 0.1 s per 14-second stretch of speech on an M2 Max). Choose Whisper `large-v3-turbo` (MLX) in **Settings → Model** for other languages.
+* **Formatting**: the same Qwen2.5-1.5B model as Windows, on the Mac's GPU through Metal.
+* **Permissions**: setup walks you through Microphone, Accessibility and Input Monitoring (for shortcuts and pasting), plus Screen Recording if you want screenshots.
+* **Shortcuts**: hold **Right ⌥ Option** to talk, or tap **⌃ Control + ⇧ Shift + Space** for hands-free. Drag a screenshot region with **⌥ Option** held.
+* First download: about 1.6 GB (Parakeet ~460 MB + Qwen ~1.1 GB).
+* The build is signed ad hoc until a Developer ID is set up: the first time, right-click FlowState in Applications and choose **Open**.
 
 > [!TIP]
 > On first launch, FlowState displays an interactive setup dialog that downloads the local open-weights AI models (on NVIDIA GPUs: ~1.6 GB Whisper + ~1.5 GB Qwen2.5 text formatting; on CPU-only machines: a smaller Whisper + ~1.1 GB Qwen2.5) directly from Hugging Face. After this initial one-time download, FlowState functions entirely offline.
@@ -80,11 +92,13 @@ FlowState hot-reloads this file automatically without needing a restart.
 
 | Component | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Speech-to-Text** | `faster-whisper` (CTranslate2) | High-speed local Whisper speech recognition (`large-v3-turbo` on CUDA / `base.en` on CPU). |
-| **Text Structuring** | CTranslate2 on GPU / `llama-cpp-python` on CPU (`Qwen2.5-1.5B-Instruct`) | Local LLM laying out emails, lists, paragraphs and punctuation; a word-alignment guard keeps every dictated word (no paraphrasing). |
-| **Visual Grounding** | `mss` + `Pillow` + Native Hooks | Gesture detection (circle bounding & rectangle drag) with timestamped annotation. |
-| **Desktop UI** | `PySide6` (Qt for Python) | Neo-brutalist, DPI-scaled desktop shell with tray menus, waveform HUD, and settings. |
-| **Input Interception** | Low-Level Windows API Hooks | Win32 keyboard & mouse hooks (`pynput` / `pywin32`) for reliable global hotkeys. |
+| **Speech-to-Text** | `faster-whisper` (CTranslate2); Parakeet v2 via FluidAudio/CoreML and Whisper via MLX on macOS | Local speech recognition (`large-v3-turbo` on CUDA / `base.en` on CPU; Parakeet v2 on the Apple Neural Engine). |
+| **Text Structuring** | CTranslate2 on GPU / `llama-cpp-python` on CPU or Metal (`Qwen2.5-1.5B-Instruct`) | Local LLM laying out emails, lists, paragraphs and punctuation; a word-alignment guard keeps every dictated word (no paraphrasing). |
+| **Visual Grounding** | `mss` + `Pillow` + Native Hooks | Gesture detection (circle bounding & rectangle drag) with timestamped annotation, Retina-aware on macOS. |
+| **Desktop UI** | `PySide6` (Qt for Python) | Neo-brutalist, DPI-scaled desktop shell with tray/menu-bar menus, waveform HUD, and settings. |
+| **OS integration** | `flowstate/platform/` adapters | Win32 hooks and clipboard on Windows; Quartz event taps, NSPasteboard and AppKit on macOS. |
+
+FlowState's code is split so a feature is written once for every platform: see [**docs/ARCHITECTURE.md**](docs/ARCHITECTURE.md).
 
 For a plain-English explanation of the pipeline and local AI models, see [**HOW_IT_WORKS.md**](HOW_IT_WORKS.md).
 
@@ -93,7 +107,7 @@ For a plain-English explanation of the pipeline and local AI models, see [**HOW_
 ## 🔒 Privacy & Storage
 
 FlowState is built on an uncompromising privacy foundation:
-- **Audio & Transcripts**: Processed solely in RAM and stored locally under `%LOCALAPPDATA%\FlowState\sessions\`.
+- **Audio & Transcripts**: Processed solely in RAM and stored locally under `%LOCALAPPDATA%\FlowState\sessions\` (Windows) or `~/Library/Application Support/FlowState/sessions/` (macOS).
 - **History**: Session history is cleared each time FlowState starts. Completed transcripts from the current run remain available locally until you clear history or restart the app.
 - **Network Boundaries**: Network access covers public model downloads and GitHub update checks. Anonymous usage counters are sent to PostHog only after explicit opt-in; speech and screen content remain local.
 
@@ -120,6 +134,15 @@ python -m pip install -e .
 # 4. Run application from source
 python -m flowstate
 ```
+
+#### macOS
+```bash
+python3.12 -m venv .venv
+CMAKE_ARGS="-DGGML_METAL=on" .venv/bin/pip install -r requirements-macos.txt
+swift build -c release --package-path native/macos/FlowStateParakeet   # Parakeet speech helper
+PYTHONPATH=src .venv/bin/python -m flowstate
+```
+macOS grants Accessibility and Input Monitoring to the app you launch from (e.g. Terminal) when running from source. Build the app with `packaging/build_macos.sh` (outputs `FlowState.app`, `FlowState-macOS.zip` for in-app updates, and a `.dmg`).
 
 ### Run Tests
 ```powershell

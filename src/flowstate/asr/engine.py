@@ -190,6 +190,13 @@ class TranscriptionEngine:
     def is_ready(self) -> bool:
         return self._model is not None
 
+    def close(self) -> None:
+        """Releases the model; stops the Parakeet helper process if running."""
+        model, self._model = self._model, None
+        close = getattr(model, "close", None)
+        if close is not None:
+            close()
+
     @property
     def active_device(self) -> str | None:
         return self._active_device

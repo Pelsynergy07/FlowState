@@ -152,6 +152,17 @@ class SmartFormatter:
         # The Metal model shares the CPU model's file.
         return llm.is_cached(llm.CUDA_MODEL) or llm.is_cached(llm.CPU_MODEL)
 
+    def close(self) -> None:
+        """Unloads the model (called when FlowState quits)."""
+        with self._inference_lock:
+            backend, self._backend = self._backend, None
+        close = getattr(backend, "close", None)
+        if close is not None:
+            try:
+                close()
+            except Exception:
+                logger.debug("Formatter backend did not close cleanly", exc_info=True)
+
     def clear_load_failure(self) -> None:
         """Allow another load attempt after a failed one (a user retrying setup)."""
         self._load_failed = False

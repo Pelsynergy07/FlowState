@@ -9,8 +9,16 @@ numpy>=1.26,<3
 mss>=9.0
 pillow>=10.3
 pynput>=1.7.6
-pywin32>=306
+pywin32>=306; sys_platform == "win32"
 huggingface_hub>=0.23
+
+# macOS: use requirements-macos.txt instead (Metal llama.cpp build, MLX,
+# PyObjC). The markers below keep this file installable there too.
+pyobjc-framework-Quartz>=10.3; sys_platform == "darwin"
+pyobjc-framework-Cocoa>=10.3; sys_platform == "darwin"
+pyobjc-framework-AVFoundation>=10.3; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices>=10.3; sys_platform == "darwin"
+mlx-whisper>=0.4; sys_platform == "darwin" and platform_machine == "arm64"
 
 # llama-cpp-python: install from the project's dedicated CPU wheel index,
 # capped at 0.3.19. The CUDA-enabled (cuXXX) wheels bundle a CPU codepath

@@ -237,6 +237,13 @@ class LlamaCppBackend:
     def count_tokens(self, text: str) -> int:
         return len(self._llm.tokenize(text.encode("utf-8"), add_bos=False))
 
+    def close(self) -> None:
+        """Frees the model now. With Metal, a model still loaded when the
+        process exits trips an assertion in ggml's Metal teardown."""
+        llm, self._llm = getattr(self, "_llm", None), None
+        if llm is not None:
+            llm.close()
+
     def stream(self, messages: list[dict], max_tokens: int) -> Iterator[str]:
         events = self._llm.create_chat_completion(messages=messages, max_tokens=max_tokens,
                                                   temperature=0.0, stream=True)

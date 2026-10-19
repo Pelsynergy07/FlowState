@@ -145,6 +145,14 @@ class RecordingController:
         if self._streaming is not None:
             self._streaming.stop_capture()
         self._recorder.abort_and_close()
+        # Unload models before interpreter teardown (Metal requires it, and
+        # it ends the Parakeet helper process).
+        for unload in (getattr(self._pipeline, "close", None), getattr(self._asr, "close", None)):
+            if unload is not None:
+                try:
+                    unload()
+                except Exception:
+                    logger.debug("Model unload failed", exc_info=True)
 
     def switch_microphone(self, device_name: str | None) -> None:
         """Dynamically switches active microphone device at runtime without requiring restart."""

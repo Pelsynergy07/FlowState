@@ -57,6 +57,11 @@ if "--verify-runtime" in sys.argv:
     from flowstate.ui import consent, onboarding
     consent.ConsentDialog().close()
     assert onboarding.shortcut_conflict("ctrl+m")
+    # Every platform adapter module must be bundled (they load by name).
+    from flowstate import platform as fs_platform
+    import flowstate.app  # noqa: F401  (pulls in the whole recording flow)
+    for part in ("keyboard", "clipboard", "focus", "window", "system"):
+        fs_platform.adapter(part)
     from flowstate import __version__
     (root / "runtime-check.json").write_text(json.dumps({"version": __version__, "qt": qVersion(),
                                                       "tabs": window.tabs.count(), "local_stats": True}), encoding="utf-8")
@@ -75,14 +80,34 @@ if "--verify-formatter" in sys.argv:
     loaded = formatter.preload(allow_download=False)
     text = formatter.correct("Hey john can we talk tomorrow thanks sarah", budget_seconds=10) if loaded else ""
     report.write_text(json.dumps({"loaded": loaded, "runtime": formatter.runtime, "text": text}), encoding="utf-8")
+    formatter.close()
     sys.exit(0 if loaded else 1)
+
+# Transcribes one recording with the real cached speech model (Parakeet on
+# the Neural Engine on Apple silicon). Reads models only.
+if "--verify-speech" in sys.argv:
+    import json
+    from pathlib import Path
+    from flowstate.asr.engine import TranscriptionEngine
+    from flowstate.asr.models import default_model_id
+    wav, report = (Path(p) for p in sys.argv[sys.argv.index("--verify-speech") + 1:][:2])
+    engine = TranscriptionEngine(model_id=default_model_id())
+    if not engine.is_target_downloaded():
+        report.write_text(json.dumps({"loaded": False, "reason": "model not downloaded"}), encoding="utf-8")
+        sys.exit(1)
+    words = engine.transcribe_words(wav)
+    report.write_text(json.dumps({"loaded": True, "device": engine.active_device, "model": engine.active_model_id,
+                                  "text": " ".join(w for _s, _e, w in words)}), encoding="utf-8")
+    engine.close()
+    sys.exit(0)
 
 from flowstate.__main__ import main
 
 if __name__ == "__main__":
-    try:
-        import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("pelsynergy.flowstate.app")
-    except Exception:
-        pass
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("pelsynergy.flowstate.app")
+        except Exception:
+            pass
     sys.exit(main())

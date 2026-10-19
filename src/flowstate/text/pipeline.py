@@ -29,6 +29,11 @@ class CleanupPipeline:
     def preload(self) -> bool:
         return self._formatter.preload()
 
+    def close(self) -> None:
+        close = getattr(self._formatter, "close", None)
+        if close is not None:
+            close()
+
     def run(self, text: str, *, budget_seconds: float | None = None, allow_load: bool = True, cancel_event=None,
             polish: bool | None = None) -> str:
         result = text

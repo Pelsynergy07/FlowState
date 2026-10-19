@@ -52,3 +52,5 @@ preview.bat
 native/macos/*/.build/
 native/macos/*/Package.resolved
 .DS_Store
+packaging/build_macos/
+packaging/dist_macos/
