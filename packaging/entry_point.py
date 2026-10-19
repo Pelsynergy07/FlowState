@@ -66,7 +66,9 @@ if "--verify-runtime" in sys.argv:
     (root / "runtime-check.json").write_text(json.dumps({"version": __version__, "qt": qVersion(),
                                                       "tabs": window.tabs.count(), "local_stats": True}), encoding="utf-8")
     window.close()
-    sys.exit(0)
+    # Skip interpreter teardown: Python and Qt both freeing the never-shown
+    # widgets in a scripted check aborted with a malloc error on macOS.
+    os._exit(0)
 
 # Formats a sample with the real cached formatter model (GPU or CPU) inside
 # the frozen runtime. Reads models only: nothing is downloaded or removed.
