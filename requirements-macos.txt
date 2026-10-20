@@ -25,3 +25,4 @@ pyobjc-framework-ApplicationServices>=10.3
 
 pytest>=8.2
 pyinstaller>=6.10
+dmgbuild>=1.6

@@ -54,11 +54,15 @@ codesign --verify --deep --strict "$APP"
 echo "== 4/4: zip and dmg =="
 rm -rf "$OUT" && mkdir -p "$OUT"
 ditto -c -k --keepParent "$APP" "$OUT/FlowState-macOS.zip"
-STAGE="$(mktemp -d)"
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "FlowState" -srcfolder "$STAGE" -ov -format UDZO "$OUT/FlowState-$VERSION.dmg" >/dev/null
-rm -rf "$STAGE"
+# The disk-image window shows drag-to-Applications and the first-launch
+# steps for an app macOS can't verify yet (packaging/macos_dmg).
+BG="$(mktemp -d)"
+"$PYTHON" "$PACKAGING_DIR/macos_dmg/make_background.py" "$BG"
+tiffutil -cathidpicheck "$BG/background.png" "$BG/background@2x.png" -out "$BG/background.tiff" >/dev/null
+"$PYTHON" -m dmgbuild -s "$PACKAGING_DIR/macos_dmg/dmg_settings.py" \
+  -D app="$APP" -D background="$BG/background.tiff" "FlowState" "$OUT/FlowState-$VERSION.dmg"
+rm -rf "$BG"
+cp "$OUT/FlowState-$VERSION.dmg" "$OUT/FlowState-macOS.dmg"
 
 echo ""
 echo "Done:"
