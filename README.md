@@ -52,7 +52,7 @@ Grab the standalone setup installer from our latest release:
 * **Permissions**: setup walks you through Microphone, Accessibility and Input Monitoring (for shortcuts and pasting), plus Screen Recording if you want screenshots.
 * **Shortcuts**: hold **Right ⌥ Option** to talk, or press **Fn + ⇧ Shift + Space** for hands-free. Drag a screenshot region with **⇧ Shift** held.
 * First download: about 1.6 GB (Parakeet ~460 MB + Qwen ~1.1 GB).
-* The app isn't notarized by Apple yet. The first time you open it, macOS stops it: go to **System Settings → Privacy & Security** and click **Open Anyway**.
+* The app isn't notarized by Apple yet. The first time you open it, macOS says it "could not verify" FlowState: click **Done**, go to **System Settings → Privacy & Security** and click **Open Anyway**. If that button doesn't appear, run `xattr -dr com.apple.quarantine /Applications/FlowState.app` in Terminal once, then open FlowState again.
 
 > [!TIP]
 > On first launch, FlowState displays an interactive setup dialog that downloads the local open-weights AI models (on NVIDIA GPUs: ~1.6 GB Whisper + ~1.5 GB Qwen2.5 text formatting; on CPU-only machines: a smaller Whisper + ~1.1 GB Qwen2.5) directly from Hugging Face. After this initial one-time download, FlowState functions entirely offline.
